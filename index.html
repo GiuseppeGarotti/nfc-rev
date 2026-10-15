@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>NFC REV</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #efe4cf;
+    min-height: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .wrap {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    line-height: 0;
+  }
+  .wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  a.hotspot {
+    position: absolute;
+    left: 7.5%;
+    width: 85%;
+    display: block;
+    border-radius: 6%;
+  }
+  /* percentages measured against the 941x1672 reference image */
+  .hs-instagram { top: 36.2%; height: 9.3%; }
+  .hs-tiktok    { top: 47.2%; height: 9.3%; }
+  .hs-whatsapp  { top: 58.3%; height: 9.3%; }
+  .hs-nfcrev    { top: 69.4%; height: 9.3%; }
+
+  a.hotspot:active { background: rgba(0,0,0,0.06); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img src="nfcrev-card.png" alt="NFC REV - Tutto il tuo business in un tap" draggable="false">
+
+    <a class="hotspot hs-instagram" href="https://instagram.com/nfc_giuseppegarotti" target="_blank" rel="noopener" aria-label="Seguici su Instagram"></a>
+    <a class="hotspot hs-tiktok" href="https://tiktok.com/@nfc_feedcards" target="_blank" rel="noopener" aria-label="Seguici su TikTok"></a>
+    <a class="hotspot hs-whatsapp" href="https://wa.me/393282267938" target="_blank" rel="noopener" aria-label="Contattaci su WhatsApp"></a>
+    <a class="hotspot hs-nfcrev" href="shop/" aria-label="Scopri di più su NFC REV"></a>
+  </div>
+</body>
+</html>
