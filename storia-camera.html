@@ -3,31 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Crea la tua storia</title>
+<title>Stefania Garotti · Make-up Artist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; min-height: 100vh;
-         display: flex; align-items: center; justify-content: center; background: #fafafa; color: #222; }
-  .box { text-align: center; padding: 24px; max-width: 340px; }
-  a.btn { display: block; margin: 12px 0; padding: 14px; border-radius: 12px; text-decoration: none;
-          font-weight: 600; background: #d62976; color: #fff; }
-  a.alt { background: #fff; color: #222; border: 1px solid #ddd; }
-  p { color: #666; font-size: 14px; }
+  :root {
+    --ivory: #faf5f0;
+    --blush: #ecd5cc;
+    --rose: #b7766b;
+    --ink: #2b2220;
+    --gold: #b8935a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(120% 80% at 50% 0%, #f6e7e0 0%, var(--ivory) 55%, #f3e6df 100%);
+    color: var(--ink); font-family: "Jost", -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    width: 100%; max-width: 380px; margin: 24px; padding: 44px 28px 36px; text-align: center;
+    background: rgba(255,255,255,.55); border: 1px solid rgba(184,147,90,.45);
+    outline: 1px solid rgba(184,147,90,.25); outline-offset: 6px;
+  }
+  .eyebrow { font-size: 11px; letter-spacing: .38em; text-transform: uppercase; color: var(--gold); margin: 0 0 18px; }
+  h1 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: 38px; line-height: 1.1; margin: 0; }
+  .rule { width: 44px; height: 1px; background: var(--gold); margin: 22px auto; border: 0; }
+  p.lead { font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 20px; line-height: 1.4; margin: 0 0 8px; }
+  .handle { display: inline-block; margin: 6px 0 28px; padding: 8px 16px; font-weight: 500; font-size: 17px;
+            letter-spacing: .02em; color: var(--rose); background: var(--blush); border-radius: 999px; }
+  a.btn { display: block; padding: 16px 20px; text-decoration: none; text-transform: uppercase;
+          letter-spacing: .22em; font-size: 12px; font-weight: 500; color: #fff;
+          background: var(--ink); border-radius: 2px; transition: background .2s; }
+  a.btn:active { background: var(--rose); }
+  p.note { font-size: 12px; font-weight: 300; color: #7a6a66; margin: 18px 0 0; min-height: 16px; letter-spacing: .03em; }
 </style>
 </head>
 <body>
-<div class="box">
-  <h2>Apro la fotocamera storie…</h2>
-  <p id="msg">Se non si apre da sola, tocca il pulsante qui sotto.</p>
+<main class="card">
+  <p class="eyebrow">Make-up Artist</p>
+  <h1>Stefania<br>Garotti</h1>
+  <hr class="rule">
+  <p class="lead">Pubblica una storia<br>e menzionami</p>
+  <span class="handle">@stefaniagarottimua</span>
   <a class="btn" href="instagram://story-camera">Apri fotocamera storie</a>
-  <a id="store" class="btn alt" href="#">Scarica Instagram</a>
-</div>
+  <p class="note" id="msg">Ricorda di menzionarmi nella tua storia</p>
+</main>
 
 <script>
-  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  document.getElementById("store").href = isIOS
-    ? "https://apps.apple.com/app/instagram/id389801252"
-    : "https://play.google.com/store/apps/details?id=com.instagram.android";
-
   var left = false;
   document.addEventListener("visibilitychange", function () { if (document.hidden) left = true; });
   window.addEventListener("pagehide", function () { left = true; });
@@ -36,8 +61,7 @@
 
   setTimeout(function () {
     if (!left) {
-      document.getElementById("msg").textContent =
-        "Non è partita in automatico. Tocca il pulsante, oppure installa Instagram.";
+      document.getElementById("msg").textContent = "Se non si apre da sola, tocca il pulsante";
     }
   }, 2000);
 </script>
