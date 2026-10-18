@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crea la tua storia</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; background: #fafafa; color: #222; }
+  .box { text-align: center; padding: 24px; max-width: 340px; }
+  a.btn { display: block; margin: 12px 0; padding: 14px; border-radius: 12px; text-decoration: none;
+          font-weight: 600; background: #d62976; color: #fff; }
+  a.alt { background: #fff; color: #222; border: 1px solid #ddd; }
+  p { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>Apro Instagram…</h2>
+  <p id="msg">Se non si apre da solo, tocca il pulsante qui sotto.</p>
+  <a id="open" class="btn" href="#">Apri Instagram</a>
+  <a id="story" class="btn alt" href="instagram://story-camera">Apri solo la fotocamera storie</a>
+  <a id="store" class="btn alt" href="#">Scarica Instagram</a>
+</div>
+
+<script>
+  // >>> CAMBIA QUI lo username da menzionare (senza @).
+  // In alternativa usa l'indirizzo con ?u=nomeutente, es. https://tuosito.it/storia.html?u=nomeutente
+  var DEFAULT_USERNAME = "TUO_USERNAME";
+
+  var params = new URLSearchParams(location.search);
+  var username = (params.get("u") || DEFAULT_USERNAME).replace(/^@/, "");
+
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var storeUrl = isIOS
+    ? "https://apps.apple.com/app/instagram/id389801252"
+    : "https://play.google.com/store/apps/details?id=com.instagram.android";
+
+  // Link non ufficiale: fotocamera storie con menzione.
+  var mentionLink = "instagram://mention?username=" + encodeURIComponent(username);
+
+  document.getElementById("open").href = mentionLink;
+  document.getElementById("store").href = storeUrl;
+
+  var left = false;
+  document.addEventListener("visibilitychange", function () { if (document.hidden) left = true; });
+  window.addEventListener("pagehide", function () { left = true; });
+
+  // Tentativo automatico all'apertura della pagina
+  window.location.href = mentionLink;
+
+  // Se dopo 2 secondi siamo ancora qui, l'app non si è aperta
+  setTimeout(function () {
+    if (!left) {
+      document.getElementById("msg").textContent =
+        "Non è partito in automatico. Prova il pulsante, oppure installa Instagram.";
+    }
+  }, 2000);
+</script>
+</body>
+</html>
