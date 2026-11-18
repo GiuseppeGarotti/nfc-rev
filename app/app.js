@@ -75,6 +75,11 @@
     var who = S.owners[v.owner_id];
     return '<div class="msg info">Stai guardando il locale di un cliente' + (who ? ' (' + esc(who) + ')' : '') + ', in sola lettura.</div>';
   }
+  function adminQBanner() {
+    var v = currentVenue();
+    var who = v && S.owners[v.owner_id];
+    return '<div class="msg info">Stai modificando le domande del locale di un cliente' + (who ? ' (' + esc(who) + ')' : '') + '. Le modifiche valgono subito per i suoi clienti.</div>';
+  }
   function isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   }
@@ -320,8 +325,8 @@
 
   function viewQuestions() {
     var v = currentVenue();
-    var ro = isReadOnly();
-    var h = roBanner() + '<div class="spread" style="margin-bottom:10px"><div><h2>Domande</h2><p class="muted" style="margin:0">' + (ro ? 'Domande attuali del questionario.' : 'Le modifiche valgono subito per i nuovi clienti.') + '</p></div>' +
+    var ro = isReadOnly() && !S.isAdmin;
+    var h = (isReadOnly() ? (S.isAdmin ? adminQBanner() : roBanner()) : '') + '<div class="spread" style="margin-bottom:10px"><div><h2>Domande</h2><p class="muted" style="margin:0">' + (ro ? 'Domande attuali del questionario.' : 'Le modifiche valgono subito per i nuovi clienti.') + '</p></div>' +
       (ro ? '' : '<button class="btn gold small" id="addQ">+ Nuova</button>') + '</div>';
     if (v) h += '<p><a href="' + esc(formUrl(v.slug)) + '" target="_blank" rel="noopener">Vedi come lo vede il cliente</a></p>';
     if (!S.questions.length) h += '<div class="empty">' + (ro ? 'Nessuna domanda.' : 'Nessuna domanda. Aggiungine una.') + '</div>';
@@ -375,7 +380,7 @@
       '<label for="vThanks">Messaggio di ringraziamento (facoltativo)</label>' +
       '<input id="vThanks" type="text" maxlength="300" placeholder="Grazie, il tuo parere ci aiuta a migliorare!" value="' + esc(v.thanks_text || '') + '">' +
       '<div id="vMsg"></div><div style="margin-top:14px"><button class="btn gold block" id="vSave">Salva</button></div></div>') +
-      (S.isAdmin && !ro ? '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
+      (S.isAdmin ? '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Cancella definitivamente questo locale dal database, con tutte le sue domande e risposte. Il proprietario non lo vedrà più e il suo QR smetterà di funzionare.</p>' +
       '<button class="btn danger small" id="vDelete">Elimina locale</button></div>' : '');
   }
 
@@ -499,9 +504,13 @@
     if ((el = document.getElementById('vSave'))) el.onclick = saveVenue;
     if ((el = document.getElementById('vDelete'))) el.onclick = function () {
       var v = currentVenue();
-      if (!v || !confirm('Eliminare "' + v.name + '" con tutte le domande e le risposte? Non si può annullare.')) return;
-      guard(sb.from('venues').delete().eq('id', v.id).then(function (r) {
+      if (!v) return;
+      var typed = window.prompt('Stai per cancellare definitivamente "' + v.name + '" con tutte le domande e le risposte.\nNon si può annullare.\n\nPer confermare scrivi il nome del locale:');
+      if (typed == null) return;
+      if (typed.trim().toLowerCase() !== v.name.trim().toLowerCase()) { toast('Il nome non coincide: locale non eliminato'); return; }
+      guard(sb.from('venues').delete().eq('id', v.id).select('id').then(function (r) {
         if (r.error) throw r.error;
+        if (!r.data || !r.data.length) throw new Error('Eliminazione non riuscita: mancano i permessi. Hai eseguito il file SQL?');
         S.venues = S.venues.filter(function (x) { return x.id !== v.id; });
         S.venueId = S.venues[0] ? S.venues[0].id : null; S.questions = []; S.responses = [];
         return S.venueId ? loadVenueData() : null;
@@ -564,7 +573,7 @@
       var btn = document.getElementById('qSave'); btn.disabled = true;
       var p;
       if (e.id) {
-        p = sb.from('questions').update(row).eq('id', e.id);
+        p = sb.from('questions').update(row).eq('id', e.id).select('id');
       } else {
         var maxPos = S.questions.reduce(function (m, q) { return Math.max(m, q.position); }, -1);
         row.venue_id = S.venueId; row.position = maxPos + 1;
@@ -572,6 +581,7 @@
       }
       p.then(function (r) {
         if (r.error) throw r.error;
+        if (e.id && (!r.data || !r.data.length)) throw new Error('Modifica non riuscita: mancano i permessi. Hai eseguito il file SQL?');
         S.editing = null;
         return loadVenueData();
       }).then(function () { render(); toast('Salvato'); })
