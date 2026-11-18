@@ -31,6 +31,7 @@
     owners: {},
     codes: [],
     editing: null,
+    delVenue: false,
     busy: false,
     installDismissed: false
   };
@@ -237,7 +238,7 @@
     else if (S.tab === 'venue') body = viewVenue();
     else if (S.tab === 'admin' && S.isAdmin) body = viewAdmin();
     else body = viewAnswers();
-    $app.innerHTML = header() + '<div class="wrap">' + body + '</div>' + tabsBar() + (S.editing ? modalQuestion() : '');
+    $app.innerHTML = header() + '<div class="wrap">' + body + '</div>' + tabsBar() + (S.editing ? modalQuestion() : '') + (S.delVenue ? modalDelete() : '');
     bind();
   }
 
@@ -358,6 +359,19 @@
       '<label class="check"><input type="checkbox" id="qReq"' + (q.required ? ' checked' : '') + '> Risposta obbligatoria</label>' +
       '<div id="mErr"></div>' +
       '<div style="margin-top:16px"><button class="btn gold block" id="qSave">Salva</button></div></div></div>';
+  }
+
+  function modalDelete() {
+    var v = currentVenue();
+    if (!v) return '';
+    return '<div class="modal-bg" id="dbg"><div class="modal" role="dialog" aria-modal="true">' +
+      '<h2>Eliminare il locale?</h2>' +
+      '<p class="muted" style="margin-top:8px">Stai per cancellare definitivamente <b>' + esc(v.name) + '</b> con tutte le sue domande e risposte. Il suo QR code smetterà di funzionare. Non si può annullare.</p>' +
+      '<label for="dName">Per confermare scrivi: <b>' + esc(v.name) + '</b></label>' +
+      '<input id="dName" type="text" autocomplete="off" autocapitalize="off">' +
+      '<div id="dErr"></div>' +
+      '<div class="row" style="margin-top:14px"><button class="btn line grow" id="dCancel">Annulla</button>' +
+      '<button class="btn danger grow" id="dGo" disabled>Elimina definitivamente</button></div></div></div>';
   }
 
   function viewVenue() {
@@ -503,19 +517,10 @@
     if ((el = document.getElementById('dlQr'))) el.onclick = downloadQr;
     if ((el = document.getElementById('vSave'))) el.onclick = saveVenue;
     if ((el = document.getElementById('vDelete'))) el.onclick = function () {
-      var v = currentVenue();
-      if (!v) return;
-      var typed = window.prompt('Stai per cancellare definitivamente "' + v.name + '" con tutte le domande e le risposte.\nNon si può annullare.\n\nPer confermare scrivi il nome del locale:');
-      if (typed == null) return;
-      if (typed.trim().toLowerCase() !== v.name.trim().toLowerCase()) { toast('Il nome non coincide: locale non eliminato'); return; }
-      guard(sb.from('venues').delete().eq('id', v.id).select('id').then(function (r) {
-        if (r.error) throw r.error;
-        if (!r.data || !r.data.length) throw new Error('Eliminazione non riuscita: mancano i permessi. Hai eseguito il file SQL?');
-        S.venues = S.venues.filter(function (x) { return x.id !== v.id; });
-        S.venueId = S.venues[0] ? S.venues[0].id : null; S.questions = []; S.responses = [];
-        return S.venueId ? loadVenueData() : null;
-      }).then(function () { S.tab = 'answers'; render(); }));
+      S.delVenue = true; render();
+      var inp = document.getElementById('dName'); if (inp) inp.focus();
     };
+    if (S.delVenue) bindDelete();
 
     // admin
     if ((el = document.getElementById('cGen'))) el.onclick = genCodes;
@@ -547,6 +552,33 @@
         }).then(render));
       };
     });
+  }
+
+  function bindDelete() {
+    var v = currentVenue();
+    var close = function () { S.delVenue = false; render(); };
+    document.getElementById('dCancel').onclick = close;
+    document.getElementById('dbg').onclick = function (e) { if (e.target.id === 'dbg') close(); };
+    var inp = document.getElementById('dName'), go = document.getElementById('dGo');
+    inp.oninput = function () {
+      go.disabled = !v || inp.value.trim().toLowerCase() !== v.name.trim().toLowerCase();
+    };
+    go.onclick = function () {
+      if (!v || go.disabled) return;
+      go.disabled = true;
+      sb.from('venues').delete().eq('id', v.id).select('id').then(function (r) {
+        if (r.error) throw r.error;
+        if (!r.data || !r.data.length) throw new Error('Eliminazione non riuscita: mancano i permessi. Hai eseguito il file SQL?');
+        S.venues = S.venues.filter(function (x) { return x.id !== v.id; });
+        S.venueId = S.venues[0] ? S.venues[0].id : null; S.questions = []; S.responses = [];
+        S.delVenue = false;
+        return S.venueId ? loadVenueData() : null;
+      }).then(function () { S.tab = 'answers'; render(); toast('Locale eliminato'); })
+        .catch(function (e) {
+          go.disabled = false;
+          document.getElementById('dErr').innerHTML = '<div class="msg err">' + esc(errText(e)) + '</div>';
+        });
+    };
   }
 
   function bindModal() {
