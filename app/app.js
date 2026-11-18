@@ -193,7 +193,7 @@
   function header() {
     var opts = S.venues.map(function (v) {
       return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name) + '</option>';
-    }).join('');
+    }).join('') + (S.venues.length ? '<option value="__new__">+ Aggiungi un altro locale…</option>' : '');
     return '<div class="top"><div class="top-in"><span class="brand">NFC <b>REV</b></span>' +
       (S.venues.length ? '<select id="venueSel" aria-label="Locale">' + opts + '</select>' : '<span class="grow"></span>') +
       '<button class="logout" id="logout">Esci</button></div></div>';
@@ -351,9 +351,6 @@
       '<label for="vThanks">Messaggio di ringraziamento (facoltativo)</label>' +
       '<input id="vThanks" type="text" maxlength="300" placeholder="Grazie, il tuo parere ci aiuta a migliorare!" value="' + esc(v.thanks_text || '') + '">' +
       '<div id="vMsg"></div><div style="margin-top:14px"><button class="btn gold block" id="vSave">Salva</button></div></div>' +
-      '<div class="card"><h2>Altri locali</h2><p class="muted">Aggiungi un altro locale: avrà il suo link, le sue domande e le sue risposte.</p>' +
-      '<label for="nvName">Nome del nuovo locale</label><input id="nvName" type="text" maxlength="80">' +
-      '<div style="margin-top:12px"><button class="btn line block" id="nvCreate">Aggiungi locale</button></div></div>' +
       '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
       '<button class="btn danger small" id="vDelete">Elimina locale</button></div>';
   }
@@ -389,6 +386,16 @@
     };
     var sel = document.getElementById('venueSel');
     if (sel) sel.onchange = function () {
+      if (sel.value === '__new__') {
+        sel.value = S.venueId;
+        var nm = (window.prompt('Nome del nuovo locale') || '').trim();
+        if (!nm) return;
+        guard(createVenue(nm).then(function (v) {
+          S.venues.push(v); S.venueId = v.id; lsSet('nfcrev_venue', v.id);
+          return loadVenueData().then(function () { S.tab = 'questions'; render(); toast('Locale creato'); });
+        }));
+        return;
+      }
       S.venueId = sel.value; lsSet('nfcrev_venue', S.venueId);
       guard(loadVenueData().then(render));
     };
