@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questionario</title>
+<meta name="theme-color" content="#141414">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../app/ui.css">
+</head>
+<body>
+<div class="public" id="root"><p class="muted" style="text-align:center;padding:40px 0">Caricamento…</p></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../app/config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cfg = window.NFCREV_CONFIG;
+  var sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: false, autoRefreshToken: false } });
+  var root = document.getElementById('root');
+  var slug = (new URLSearchParams(location.search).get('l') || '').trim().toLowerCase();
+  var form = null;
+  var answers = {};
+  var sending = false;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function msg(title, text) {
+    root.innerHTML = '<div class="thanks"><h1>' + esc(title) + '</h1><p class="muted" style="margin-top:8px">' + esc(text) + '</p></div>';
+  }
+
+  function load() {
+    if (!slug) { msg('Link non valido', 'Il link del questionario non è completo.'); return; }
+    sb.rpc('get_public_form', { p_slug: slug }).then(function (r) {
+      if (r.error) throw r.error;
+      if (!r.data) { msg('Questionario non trovato', 'Controlla il link o scansiona di nuovo il QR code.'); return; }
+      form = r.data;
+      document.title = form.name;
+      if (!form.questions || !form.questions.length) { msg(form.name, 'Il questionario non ha ancora domande.'); return; }
+      render();
+    }).catch(function () { msg('Qualcosa non va', 'Non riesco a caricare il questionario. Riprova tra poco.'); });
+  }
+
+  function render(errorText) {
+    var h = '<div class="head"><div class="tag">IL TUO PARERE CONTA</div><h1>' + esc(form.name) + '</h1>' +
+      '<p class="muted" style="margin-top:6px">Ci vogliono 30 secondi.</p></div>';
+    form.questions.forEach(function (q, i) {
+      h += '<div class="qblock" data-q="' + esc(q.id) + '"><div class="qt">' + esc(q.text) + (q.required ? ' <span class="req">*</span>' : '') + '</div>';
+      var v = answers[q.id];
+      if (q.type === 'stars') {
+        h += '<div class="starpick">';
+        for (var s = 1; s <= 5; s++) h += '<button type="button" data-star="' + s + '" class="' + (v >= s ? 'on' : '') + '" aria-label="' + s + ' stelle">★</button>';
+        h += '</div>';
+      } else if (q.type === 'yesno') {
+        h += '<div class="yn"><button type="button" data-yn="si" class="' + (v === 'si' ? 'on' : '') + '">Sì</button>' +
+          '<button type="button" data-yn="no" class="' + (v === 'no' ? 'on' : '') + '">No</button></div>';
+      } else if (q.type === 'single') {
+        h += '<div class="opts">' + (q.options || []).map(function (o, k) {
+          return '<button type="button" data-opt="' + k + '" class="' + (v === o ? 'on' : '') + '">' + esc(o) + '</button>';
+        }).join('') + '</div>';
+      } else if (q.type === 'multi') {
+        h += '<div class="opts">' + (q.options || []).map(function (o, k) {
+          var on = Array.isArray(v) && v.indexOf(o) >= 0;
+          return '<button type="button" data-mopt="' + k + '" class="' + (on ? 'on' : '') + '">' + (on ? '✓ ' : '') + esc(o) + '</button>';
+        }).join('') + '</div>';
+      } else {
+        h += '<textarea data-text="1" maxlength="1000" placeholder="Scrivi qui…">' + esc(v || '') + '</textarea>';
+      }
+      h += '</div>';
+    });
+    h += (errorText ? '<div class="msg err">' + esc(errorText) + '</div>' : '') +
+      '<button class="btn gold block" id="send"' + (sending ? ' disabled' : '') + ' style="margin-top:6px;padding:15px">' + (sending ? 'Invio…' : 'Invia') + '</button>' +
+      '<p class="muted" style="text-align:center;margin-top:14px">Le risposte sono anonime.</p>';
+    root.innerHTML = h;
+    bind();
+  }
+
+  function bind() {
+    Array.prototype.forEach.call(root.querySelectorAll('[data-q]'), function (block) {
+      var id = block.getAttribute('data-q');
+      var q = form.questions.filter(function (x) { return x.id === id; })[0];
+      Array.prototype.forEach.call(block.querySelectorAll('[data-star]'), function (b) {
+        b.onclick = function () { answers[id] = parseInt(b.getAttribute('data-star'), 10); keepScroll(); };
+      });
+      Array.prototype.forEach.call(block.querySelectorAll('[data-yn]'), function (b) {
+        b.onclick = function () { answers[id] = b.getAttribute('data-yn'); keepScroll(); };
+      });
+      Array.prototype.forEach.call(block.querySelectorAll('[data-opt]'), function (b) {
+        b.onclick = function () { answers[id] = q.options[parseInt(b.getAttribute('data-opt'), 10)]; keepScroll(); };
+      });
+      Array.prototype.forEach.call(block.querySelectorAll('[data-mopt]'), function (b) {
+        b.onclick = function () {
+          var o = q.options[parseInt(b.getAttribute('data-mopt'), 10)];
+          var cur = Array.isArray(answers[id]) ? answers[id].slice() : [];
+          var i = cur.indexOf(o);
+          if (i >= 0) cur.splice(i, 1); else cur.push(o);
+          answers[id] = cur; keepScroll();
+        };
+      });
+      var t = block.querySelector('[data-text]');
+      if (t) t.oninput = function () { answers[id] = t.value; };
+    });
+    document.getElementById('send').onclick = send;
+  }
+  function keepScroll() {
+    var y = window.scrollY; render(); window.scrollTo(0, y);
+  }
+
+  function send() {
+    if (sending) return;
+    var payload = [];
+    for (var i = 0; i < form.questions.length; i++) {
+      var q = form.questions[i];
+      var v = answers[q.id];
+      var empty = v == null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'string' && !v.trim());
+      if (empty) {
+        if (q.required) { render('Rispondi alle domande contrassegnate con *.'); window.scrollTo(0, 0); return; }
+        continue;
+      }
+      payload.push({ question_id: q.id, value: typeof v === 'string' && q.type === 'text' ? v.trim() : v });
+    }
+    if (!payload.length) { render('Rispondi ad almeno una domanda.'); window.scrollTo(0, 0); return; }
+    sending = true; render();
+    sb.rpc('submit_response', { p_slug: slug, p_answers: payload }).then(function (r) {
+      if (r.error) throw r.error;
+      thanks();
+    }).catch(function () {
+      sending = false; render('Invio non riuscito. Controlla la connessione e riprova.');
+    });
+  }
+
+  function thanks() {
+    var rating = null;
+    for (var i = 0; i < form.questions.length; i++) {
+      var q = form.questions[i];
+      if (q.type === 'stars' && answers[q.id]) { rating = answers[q.id]; break; }
+    }
+    var g = form.google_review_url;
+    var okUrl = g && /^https:\/\//i.test(g);
+    var h = '<div class="thanks"><div class="big">🙏</div><h1 style="margin-top:10px">Grazie!</h1>' +
+      '<p style="margin-top:8px">' + esc(form.thanks_text || 'Il tuo parere ci aiuta a migliorare.') + '</p>';
+    if (okUrl && rating && rating >= 4) {
+      h += '<div class="card" style="margin-top:22px;text-align:left"><b>Ti è piaciuto?</b>' +
+        '<p class="muted" style="margin:6px 0 12px">Una recensione su Google ci aiuta molto e richiede un minuto.</p>' +
+        '<a class="btn gold block" href="' + esc(g) + '" rel="noopener">Lascia una recensione su Google</a></div>';
+    }
+    h += '</div>';
+    root.innerHTML = h;
+    window.scrollTo(0, 0);
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
