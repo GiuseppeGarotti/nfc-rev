@@ -28,6 +28,7 @@
     responses: [],
     filter: 'all',
     isAdmin: false,
+    owners: {},
     codes: [],
     editing: null,
     busy: false,
@@ -63,6 +64,17 @@
     for (var i = 0; i < S.venues.length; i++) if (S.venues[i].id === S.venueId) return S.venues[i];
     return null;
   }
+  function myId() { return S.session && S.session.user ? S.session.user.id : null; }
+  function isReadOnly() {
+    var v = currentVenue();
+    return !!(v && myId() && v.owner_id !== myId());
+  }
+  function roBanner() {
+    var v = currentVenue();
+    if (!isReadOnly()) return '';
+    var who = S.owners[v.owner_id];
+    return '<div class="msg info">Stai guardando il locale di un cliente' + (who ? ' (' + esc(who) + ')' : '') + ', in sola lettura.</div>';
+  }
   function isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   }
@@ -90,6 +102,12 @@
     ]).then(function (r) {
       S.venues = (r[0].data) || [];
       S.isAdmin = !!(r[1].data && r[1].data.length);
+      if (!S.isAdmin) return null;
+      return sb.rpc('admin_owner_emails').then(function (o) {
+        S.owners = {};
+        (o.data || []).forEach(function (x) { S.owners[x.user_id] = x.email; });
+      });
+    }).then(function () {
       var saved = lsGet('nfcrev_venue');
       if (!currentVenue()) {
         var found = null;
@@ -184,9 +202,16 @@
   }
 
   function header() {
-    var opts = S.venues.map(function (v) {
-      return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name) + '</option>';
-    }).join('');
+    var mine = [], others = [];
+    S.venues.forEach(function (v) { (v.owner_id === myId() ? mine : others).push(v); });
+    function opt(v, withOwner) {
+      var who = withOwner && S.owners[v.owner_id] ? ' — ' + S.owners[v.owner_id] : '';
+      return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name + who) + '</option>';
+    }
+    var opts = others.length
+      ? (mine.length ? '<optgroup label="I miei locali">' + mine.map(function (v) { return opt(v, false); }).join('') + '</optgroup>' : '') +
+        '<optgroup label="Locali dei clienti">' + others.map(function (v) { return opt(v, true); }).join('') + '</optgroup>'
+      : mine.map(function (v) { return opt(v, false); }).join('');
     return '<div class="top"><div class="top-in"><span class="brand">NFC <b>REV</b></span>' +
       (S.venues.length ? '<select id="venueSel" aria-label="Locale">' + opts + '</select>' : '<span class="grow"></span>') +
       '<button class="logout" id="logout">Esci</button></div></div>';
@@ -246,7 +271,8 @@
       return true;
     });
 
-    var h = installCard();
+    var ro = isReadOnly();
+    var h = roBanner() + (ro ? '' : installCard());
     h += '<div class="stat-grid" style="margin-bottom:12px">' +
       '<div class="stat"><b>' + rs.length + '</b><span>risposte</span></div>' +
       '<div class="stat"><b>' + (avg == null ? '–' : avg.toFixed(1).replace('.', ',')) + '</b><span>voto medio</span></div>' +
@@ -276,10 +302,11 @@
       (r.answers || []).forEach(function (a) {
         h += '<div class="ans"><div class="q">' + esc(a.text) + '</div><div class="v">' + esc(fmtAnswer(a)) + '</div></div>';
       });
-      h += '<div class="row wrap-r" style="margin-top:12px">' +
+      if (!ro) h += '<div class="row wrap-r" style="margin-top:12px">' +
         (r.status !== 'read' && r.status !== 'resolved' ? '<button class="btn line small" data-st="read">Segna letta</button>' : '') +
         (r.status !== 'resolved' ? '<button class="btn line small" data-st="resolved">Risolta</button>' : '<button class="btn line small" data-st="new">Riapri</button>') +
-        '<button class="btn danger small" data-del="1">Elimina</button></div></div>';
+        '<button class="btn danger small" data-del="1">Elimina</button></div>';
+      h += '</div>';
     });
     return h;
   }
@@ -293,21 +320,22 @@
 
   function viewQuestions() {
     var v = currentVenue();
-    var h = '<div class="spread" style="margin-bottom:10px"><div><h2>Domande</h2><p class="muted" style="margin:0">Le modifiche valgono subito per i nuovi clienti.</p></div>' +
-      '<button class="btn gold small" id="addQ">+ Nuova</button></div>';
+    var ro = isReadOnly();
+    var h = roBanner() + '<div class="spread" style="margin-bottom:10px"><div><h2>Domande</h2><p class="muted" style="margin:0">' + (ro ? 'Domande attuali del questionario.' : 'Le modifiche valgono subito per i nuovi clienti.') + '</p></div>' +
+      (ro ? '' : '<button class="btn gold small" id="addQ">+ Nuova</button>') + '</div>';
     if (v) h += '<p><a href="' + esc(formUrl(v.slug)) + '" target="_blank" rel="noopener">Vedi come lo vede il cliente</a></p>';
-    if (!S.questions.length) h += '<div class="empty">Nessuna domanda. Aggiungine una.</div>';
+    if (!S.questions.length) h += '<div class="empty">' + (ro ? 'Nessuna domanda.' : 'Nessuna domanda. Aggiungine una.') + '</div>';
     S.questions.forEach(function (q, i) {
       h += '<div class="card" data-qid="' + esc(q.id) + '"><div class="spread"><div class="grow"><b>' + esc(q.text) + '</b>' +
         '<div class="muted">' + esc(TYPES[q.type] || q.type) + (q.required ? ' · obbligatoria' : '') +
         (q.options && q.options.length ? ' · ' + q.options.length + ' opzioni' : '') + '</div></div>' +
         (q.active ? '' : '<span class="pill off">Spenta</span>') + '</div>' +
-        '<div class="row wrap-r" style="margin-top:10px">' +
+        (ro ? '' : '<div class="row wrap-r" style="margin-top:10px">' +
         '<button class="btn line small" data-mv="-1"' + (i === 0 ? ' disabled' : '') + ' aria-label="Su">↑</button>' +
         '<button class="btn line small" data-mv="1"' + (i === S.questions.length - 1 ? ' disabled' : '') + ' aria-label="Giù">↓</button>' +
         '<button class="btn line small" data-edit="1">Modifica</button>' +
         '<button class="btn line small" data-toggle="1">' + (q.active ? 'Spegni' : 'Accendi') + '</button>' +
-        '<button class="btn danger small" data-qdel="1">Elimina</button></div></div>';
+        '<button class="btn danger small" data-qdel="1">Elimina</button></div>') + '</div>';
     });
     return h;
   }
@@ -331,21 +359,23 @@
     var v = currentVenue();
     if (!v) return viewNoVenue();
     var url = formUrl(v.slug);
-    return '<div class="card"><h2>Link e QR code del questionario</h2>' +
+    var ro = isReadOnly();
+    return roBanner() + '<div class="card"><h2>Link e QR code del questionario</h2>' +
       '<p class="muted">Programma questo link sul chip NFC e stampa il QR code per il supporto.</p>' +
       '<div class="linkbox"><input type="text" readonly id="linkOut" value="' + esc(url) + '"><button class="btn small" id="copyLink">Copia</button></div>' +
       '<div class="qa"><div id="qrBox"></div><div class="row wrap-r" style="justify-content:center">' +
       '<button class="btn line small" id="dlQr">Scarica QR (PNG)</button>' +
       '<a class="btn line small" href="' + esc(url) + '" target="_blank" rel="noopener">Apri</a></div></div></div>' +
-      '<div class="card"><h2>Impostazioni del locale</h2>' +
+      (ro ? '<div class="card"><h2>' + esc(v.name) + '</h2><p class="muted">Link recensione Google: ' + esc(v.google_review_url || 'non impostato') + '</p></div>' : '') +
+      (ro ? '' : '<div class="card"><h2>Impostazioni del locale</h2>' +
       '<label for="vName">Nome del locale</label><input id="vName" type="text" maxlength="80" value="' + esc(v.name) + '">' +
       '<label for="vGoogle">Link recensione Google (facoltativo)</label>' +
       '<input id="vGoogle" type="url" placeholder="https://search.google.com/local/writereview?placeid=…" value="' + esc(v.google_review_url || '') + '">' +
       '<p class="muted" style="margin-top:4px">Ai clienti che danno 4 o 5 stelle viene proposto di lasciare anche una recensione su Google.</p>' +
       '<label for="vThanks">Messaggio di ringraziamento (facoltativo)</label>' +
       '<input id="vThanks" type="text" maxlength="300" placeholder="Grazie, il tuo parere ci aiuta a migliorare!" value="' + esc(v.thanks_text || '') + '">' +
-      '<div id="vMsg"></div><div style="margin-top:14px"><button class="btn gold block" id="vSave">Salva</button></div></div>' +
-      (S.isAdmin ? '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
+      '<div id="vMsg"></div><div style="margin-top:14px"><button class="btn gold block" id="vSave">Salva</button></div></div>') +
+      (S.isAdmin && !ro ? '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
       '<button class="btn danger small" id="vDelete">Elimina locale</button></div>' : '');
   }
 
