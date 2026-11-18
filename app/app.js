@@ -32,6 +32,7 @@
     codes: [],
     editing: null,
     delVenue: false,
+    recovery: /type=recovery/.test(location.hash),
     busy: false,
     installDismissed: false
   };
@@ -142,11 +143,13 @@
   // ---------- render ----------
   function render() {
     if (!S.ready) { $app.innerHTML = '<div class="wrap"><p class="muted">Caricamento…</p></div>'; return; }
+    if (S.recovery && S.session) { renderRecovery(); return; }
     if (!S.session) { renderAuth(); return; }
     renderApp();
   }
 
   function renderAuth() {
+    if (S.authMode === 'forgot') { renderForgot(); return; }
     var reg = S.authMode === 'register';
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
@@ -163,7 +166,10 @@
       '<div style="margin-top:16px"><button class="btn gold block" type="submit"' + (S.busy ? ' disabled' : '') + '>' + (reg ? 'Registrati' : 'Entra') + '</button></div>' +
       '</form>' +
       '<p style="text-align:center"><button class="chip" id="switchAuth">' + (reg ? 'Ho già un account: accedi' : 'Ho un codice invito: registrati') + '</button></p>' +
+      (reg ? '' : '<p style="text-align:center"><button class="chip" id="forgotLink">Password dimenticata?</button></p>') +
       '</div>';
+    var fl = document.getElementById('forgotLink');
+    if (fl) fl.onclick = function () { S.authMode = 'forgot'; S.authMsg = null; render(); };
     document.getElementById('switchAuth').onclick = function () {
       S.authMode = reg ? 'login' : 'register'; S.authMsg = null; render();
     };
@@ -198,11 +204,60 @@
             if (/not confirmed/i.test(r.error.message)) throw new Error('Devi prima confermare l\'email: controlla la posta.');
             throw r.error;
           }
-          S.session = r.data.session;
+          S.session = r.data.session; S.recovery = false;
           return loadAll();
         });
       }
       p.catch(function (e) { S.authMsg = { kind: 'err', text: errText(e) }; })
+        .then(function () { S.busy = false; render(); });
+    };
+  }
+
+  function renderForgot() {
+    var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
+    $app.innerHTML =
+      '<div class="wrap" style="padding-top:40px">' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand" style="color:var(--ink);font-size:20px">NFC <b>REV</b></div></div>' +
+      '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
+      '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
+      '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
+      '<div style="margin-top:16px"><button class="btn gold block" type="submit"' + (S.busy ? ' disabled' : '') + '>Invia il link</button></div></form>' +
+      '<p style="text-align:center"><button class="chip" id="backLogin">Torna all\'accesso</button></p></div>';
+    document.getElementById('backLogin').onclick = function () { S.authMode = 'login'; S.authMsg = null; render(); };
+    document.getElementById('forgotForm').onsubmit = function (ev) {
+      ev.preventDefault();
+      var email = document.getElementById('fEmail').value.trim();
+      S.busy = true; S.authMsg = null; render();
+      sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }).then(function (r) {
+        if (r.error) throw r.error;
+        S.authMsg = { kind: 'ok', text: 'Se l\'email è registrata, ti abbiamo mandato un link. Controlla anche lo spam.' };
+      }).catch(function (e) {
+        S.authMsg = { kind: 'err', text: /rate limit|seconds/i.test(e.message || '') ? 'Hai chiesto troppi link. Riprova tra qualche minuto.' : errText(e) };
+      }).then(function () { S.busy = false; render(); });
+    };
+  }
+
+  function renderRecovery() {
+    var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
+    $app.innerHTML =
+      '<div class="wrap" style="padding-top:40px">' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand" style="color:var(--ink);font-size:20px">NFC <b>REV</b></div></div>' +
+      '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
+      '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
+      '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
+      '<div style="margin-top:16px"><button class="btn gold block" type="submit"' + (S.busy ? ' disabled' : '') + '>Salva la password</button></div></form></div>';
+    document.getElementById('recForm').onsubmit = function (ev) {
+      ev.preventDefault();
+      var a = document.getElementById('np1').value, b = document.getElementById('np2').value;
+      if (a !== b) { S.authMsg = { kind: 'err', text: 'Le due password non coincidono.' }; render(); return; }
+      S.busy = true; S.authMsg = null; render();
+      sb.auth.updateUser({ password: a }).then(function (r) {
+        if (r.error) throw r.error;
+        S.recovery = false;
+        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+        return loadAll();
+      }).then(function () { S.authMsg = null; toast('Password cambiata'); })
+        .catch(function (e) { S.authMsg = { kind: 'err', text: errText(e) }; })
         .then(function () { S.busy = false; render(); });
     };
   }
@@ -717,8 +772,13 @@
     S.session = r.data && r.data.session;
     return S.session ? loadAll() : null;
   }).catch(function () { /* mostra login */ }).then(function () {
+    if (/error_code=otp_expired|error=access_denied/.test(location.hash)) {
+      S.authMsg = { kind: 'err', text: 'Il link è scaduto o già usato. Richiedine uno nuovo da "Password dimenticata?".' };
+      try { history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+    }
     S.ready = true; render();
-    sb.auth.onAuthStateChange(function (ev) {
+    sb.auth.onAuthStateChange(function (ev, sess) {
+      if (ev === 'PASSWORD_RECOVERY') { S.recovery = true; S.session = sess || S.session; render(); }
       if (ev === 'SIGNED_OUT' && S.session) { S.session = null; render(); }
     });
   });
