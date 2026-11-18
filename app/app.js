@@ -15,13 +15,6 @@
     multi: 'Scelta multipla',
     text: 'Testo libero'
   };
-  var DEFAULTS = [
-    { text: 'Come valuti la tua esperienza in generale?', type: 'stars', required: true },
-    { text: 'Come valuti la pulizia?', type: 'stars' },
-    { text: 'Come valuti il servizio?', type: 'stars' },
-    { text: 'I prezzi ti sembrano adeguati?', type: 'yesno' },
-    { text: 'Cosa potremmo migliorare?', type: 'text' }
-  ];
 
   var S = {
     ready: false,
@@ -193,7 +186,7 @@
   function header() {
     var opts = S.venues.map(function (v) {
       return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name) + '</option>';
-    }).join('') + (S.venues.length ? '<option value="__new__">+ Aggiungi un altro locale…</option>' : '');
+    }).join('');
     return '<div class="top"><div class="top-in"><span class="brand">NFC <b>REV</b></span>' +
       (S.venues.length ? '<select id="venueSel" aria-label="Locale">' + opts + '</select>' : '<span class="grow"></span>') +
       '<button class="logout" id="logout">Esci</button></div></div>';
@@ -208,7 +201,7 @@
 
   function renderApp() {
     var body;
-    if (!S.venues.length && S.tab !== 'admin') body = viewNewVenueFirst();
+    if (!S.venues.length && S.tab !== 'admin') body = viewNoVenue();
     else if (S.tab === 'answers') body = viewAnswers();
     else if (S.tab === 'questions') body = viewQuestions();
     else if (S.tab === 'venue') body = viewVenue();
@@ -219,10 +212,11 @@
   }
 
   // ---------- viste ----------
-  function viewNewVenueFirst() {
-    return '<div class="card"><h2>Benvenuto!</h2><p class="muted">Crea il tuo primo locale per ottenere il link e il QR code del questionario.</p>' +
-      '<label for="nvName">Nome del locale</label><input id="nvName" type="text" maxlength="80" placeholder="Es. Bar Centrale">' +
-      '<div style="margin-top:14px"><button class="btn gold block" id="nvCreate">Crea locale</button></div></div>';
+  function viewNoVenue() {
+    if (S.isAdmin) {
+      return '<div class="card"><h2>Nessun locale</h2><p class="muted">Crea un locale dalla scheda <b>Admin</b> (sezione "Aggiungi un locale").</p></div>';
+    }
+    return '<div class="card"><h2>Il tuo locale non è ancora attivo</h2><p class="muted">Contatta NFC REV: ti attiviamo noi il locale e poi trovi qui domande, risposte e il QR code.</p></div>';
   }
 
   function installCard() {
@@ -335,7 +329,7 @@
 
   function viewVenue() {
     var v = currentVenue();
-    if (!v) return viewNewVenueFirst();
+    if (!v) return viewNoVenue();
     var url = formUrl(v.slug);
     return '<div class="card"><h2>Link e QR code del questionario</h2>' +
       '<p class="muted">Programma questo link sul chip NFC e stampa il QR code per il supporto.</p>' +
@@ -351,19 +345,26 @@
       '<label for="vThanks">Messaggio di ringraziamento (facoltativo)</label>' +
       '<input id="vThanks" type="text" maxlength="300" placeholder="Grazie, il tuo parere ci aiuta a migliorare!" value="' + esc(v.thanks_text || '') + '">' +
       '<div id="vMsg"></div><div style="margin-top:14px"><button class="btn gold block" id="vSave">Salva</button></div></div>' +
-      '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
-      '<button class="btn danger small" id="vDelete">Elimina locale</button></div>';
+      (S.isAdmin ? '<div class="card"><h3>Zona pericolosa</h3><p class="muted">Elimina questo locale con tutte le sue domande e risposte.</p>' +
+      '<button class="btn danger small" id="vDelete">Elimina locale</button></div>' : '');
   }
 
   function viewAdmin() {
-    var h = '<div class="card"><h2>Codici invito</h2><p class="muted">Un codice vale per un solo account. Consegnalo insieme al supporto.</p>' +
-      '<label for="cQty">Quanti ne vuoi creare?</label><select id="cQty"><option>1</option><option>5</option><option>10</option><option>20</option></select>' +
-      '<label for="cNote">Nota (facoltativa, es. nome del cliente)</label><input id="cNote" type="text" maxlength="80">' +
-      '<div style="margin-top:12px"><button class="btn gold block" id="cGen">Genera</button></div></div>';
+    var myEmail = (S.session && S.session.user && S.session.user.email) || '';
+    var h = '<div class="card"><h2>Nuovo cliente: codice invito</h2><p class="muted">Un codice vale per un solo account. Alla registrazione il cliente trova già il suo locale pronto.</p>' +
+      '<label for="cVenue">Nome del locale</label><input id="cVenue" type="text" maxlength="80" placeholder="Es. Bar Centrale">' +
+      '<label for="cQty">Quanti codici?</label><select id="cQty"><option>1</option><option>5</option><option>10</option><option>20</option></select>' +
+      '<p class="muted" style="margin-top:6px">Se ne crei più di uno, tutti avranno lo stesso nome del locale.</p>' +
+      '<div style="margin-top:12px"><button class="btn gold block" id="cGen">Genera</button></div></div>' +
+      '<div class="card"><h2>Aggiungi un locale a un account</h2><p class="muted">Per un cliente che ha già un account (anche il tuo) e vuole un altro locale.</p>' +
+      '<label for="aEmail">Email dell\'account</label><input id="aEmail" type="email" value="' + esc(myEmail) + '">' +
+      '<label for="aName">Nome del nuovo locale</label><input id="aName" type="text" maxlength="80">' +
+      '<div id="aMsg"></div><div style="margin-top:12px"><button class="btn line block" id="aAdd">Aggiungi locale</button></div></div>';
     if (!S.codes.length) h += '<div class="empty">Nessun codice.</div>';
     S.codes.forEach(function (c) {
       var st = c.used_by || c.used_at ? '<span class="pill resolved">Usato</span>' : (c.revoked ? '<span class="pill off">Annullato</span>' : '<span class="pill new">Libero</span>');
       h += '<div class="card" data-code="' + esc(c.code) + '"><div class="spread"><span class="code">' + esc(c.code) + '</span>' + st + '</div>' +
+        (c.venue_name ? '<div><b>' + esc(c.venue_name) + '</b></div>' : '') +
         (c.note ? '<div class="muted">' + esc(c.note) + '</div>' : '') +
         (c.used_email ? '<div class="muted">Usato da ' + esc(c.used_email) + ' · ' + esc(fmtDate(c.used_at)) + '</div>' : '') +
         '<div class="row" style="margin-top:8px"><button class="btn line small" data-ccopy="1">Copia</button>' +
@@ -386,16 +387,6 @@
     };
     var sel = document.getElementById('venueSel');
     if (sel) sel.onchange = function () {
-      if (sel.value === '__new__') {
-        sel.value = S.venueId;
-        var nm = (window.prompt('Nome del nuovo locale') || '').trim();
-        if (!nm) return;
-        guard(createVenue(nm).then(function (v) {
-          S.venues.push(v); S.venueId = v.id; lsSet('nfcrev_venue', v.id);
-          return loadVenueData().then(function () { S.tab = 'questions'; render(); toast('Locale creato'); });
-        }));
-        return;
-      }
       S.venueId = sel.value; lsSet('nfcrev_venue', S.venueId);
       guard(loadVenueData().then(render));
     };
@@ -406,16 +397,6 @@
         window.scrollTo(0, 0);
       };
     });
-    var nvBtn = document.getElementById('nvCreate');
-    if (nvBtn) nvBtn.onclick = function () {
-      var name = document.getElementById('nvName').value.trim();
-      if (!name) { toast('Scrivi il nome del locale'); return; }
-      nvBtn.disabled = true;
-      guard(createVenue(name).then(function (v) {
-        S.venues.push(v); S.venueId = v.id; lsSet('nfcrev_venue', v.id);
-        return loadVenueData().then(function () { S.tab = 'questions'; render(); toast('Locale creato'); });
-      })).then(function () { nvBtn.disabled = false; });
-    };
     if ((el = document.getElementById('doInstall'))) el.onclick = function () {
       if (!deferredInstall) return;
       deferredInstall.prompt();
@@ -499,6 +480,22 @@
 
     // admin
     if ((el = document.getElementById('cGen'))) el.onclick = genCodes;
+    var addBtn = document.getElementById('aAdd');
+    if (addBtn) addBtn.onclick = function () {
+      var email = document.getElementById('aEmail').value.trim();
+      var name = document.getElementById('aName').value.trim();
+      var out = document.getElementById('aMsg');
+      if (!email || !name) { out.innerHTML = '<div class="msg err">Compila email e nome del locale.</div>'; return; }
+      addBtn.disabled = true;
+      sb.rpc('admin_add_venue', { p_email: email, p_name: name }).then(function (r) {
+        if (r.error) throw r.error;
+        return loadAll();
+      }).then(function () { render(); toast('Locale aggiunto'); })
+        .catch(function (e) {
+          addBtn.disabled = false;
+          out.innerHTML = '<div class="msg err">' + esc(/USER_NOT_FOUND/.test(e.message) ? 'Nessun account con questa email.' : errText(e)) + '</div>';
+        });
+    };
     Array.prototype.forEach.call(document.querySelectorAll('[data-code]'), function (card) {
       var code = card.getAttribute('data-code');
       var c = card.querySelector('[data-ccopy]');
@@ -573,28 +570,6 @@
     }));
   }
 
-  function createVenue(name) {
-    var base = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'locale';
-    function attempt(n) {
-      var slug = base + '-' + Math.random().toString(36).slice(2, 6);
-      return sb.from('venues').insert({ name: name, slug: slug }).select().single().then(function (r) {
-        if (r.error) {
-          if (n < 4 && /duplicate|unique/i.test(r.error.message)) return attempt(n + 1);
-          throw r.error;
-        }
-        var venue = r.data;
-        var rows = DEFAULTS.map(function (d, i) {
-          return { venue_id: venue.id, position: i, text: d.text, type: d.type, options: [], required: !!d.required };
-        });
-        return sb.from('questions').insert(rows).then(function (q) {
-          if (q.error) throw q.error;
-          return venue;
-        });
-      });
-    }
-    return attempt(0);
-  }
-
   function saveVenue() {
     var v = currentVenue(); if (!v) return;
     var name = document.getElementById('vName').value.trim();
@@ -643,14 +618,15 @@
 
   function genCodes() {
     var qty = parseInt(document.getElementById('cQty').value, 10) || 1;
-    var note = document.getElementById('cNote').value.trim() || null;
+    var venueName = document.getElementById('cVenue').value.trim();
+    if (!venueName) { toast('Scrivi il nome del locale'); return; }
     var alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     function part() {
       var arr = new Uint32Array(4); crypto.getRandomValues(arr);
       return Array.prototype.map.call(arr, function (n) { return alpha[n % alpha.length]; }).join('');
     }
     var rows = [];
-    for (var i = 0; i < qty; i++) rows.push({ code: 'NFC-' + part() + '-' + part(), note: note });
+    for (var i = 0; i < qty; i++) rows.push({ code: 'NFC-' + part() + '-' + part(), venue_name: venueName });
     var btn = document.getElementById('cGen'); btn.disabled = true;
     guard(sb.from('invite_codes').insert(rows).then(function (r) {
       if (r.error) throw r.error; return loadCodes();
