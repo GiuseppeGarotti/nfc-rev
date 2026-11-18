@@ -387,8 +387,9 @@
         render();
       });
     };
-    if ((el = document.getElementById('venueSel'))) el.onchange = function () {
-      S.venueId = el.value; lsSet('nfcrev_venue', S.venueId);
+    var sel = document.getElementById('venueSel');
+    if (sel) sel.onchange = function () {
+      S.venueId = sel.value; lsSet('nfcrev_venue', S.venueId);
       guard(loadVenueData().then(render));
     };
     Array.prototype.forEach.call(document.querySelectorAll('.tabs [data-tab]'), function (b) {
@@ -398,14 +399,15 @@
         window.scrollTo(0, 0);
       };
     });
-    if ((el = document.getElementById('nvCreate'))) el.onclick = function () {
+    var nvBtn = document.getElementById('nvCreate');
+    if (nvBtn) nvBtn.onclick = function () {
       var name = document.getElementById('nvName').value.trim();
       if (!name) { toast('Scrivi il nome del locale'); return; }
-      el.disabled = true;
+      nvBtn.disabled = true;
       guard(createVenue(name).then(function (v) {
         S.venues.push(v); S.venueId = v.id; lsSet('nfcrev_venue', v.id);
         return loadVenueData().then(function () { S.tab = 'questions'; render(); toast('Locale creato'); });
-      })).then(function () { el.disabled = false; });
+      })).then(function () { nvBtn.disabled = false; });
     };
     if ((el = document.getElementById('doInstall'))) el.onclick = function () {
       if (!deferredInstall) return;
