@@ -29,6 +29,7 @@
     filter: 'all',
     isAdmin: false,
     owners: {},
+    alerts: {},
     codes: [],
     editing: null,
     delVenue: false,
@@ -121,8 +122,21 @@
         for (var i = 0; i < S.venues.length; i++) if (S.venues[i].id === saved) found = S.venues[i];
         S.venueId = found ? found.id : (S.venues[0] ? S.venues[0].id : null);
       }
-      return S.venueId ? loadVenueData() : null;
+      return loadAlerts().then(function () { return S.venueId ? loadVenueData() : null; });
     });
+  }
+  // pareri negativi (1-2 stelle) ancora "nuovi", per locale
+  function loadAlerts() {
+    return sb.from('responses').select('venue_id').eq('status', 'new').lte('rating', 2).limit(1000).then(function (r) {
+      if (r.error) return;
+      var a = {};
+      (r.data || []).forEach(function (x) { a[x.venue_id] = (a[x.venue_id] || 0) + 1; });
+      S.alerts = a;
+    }, function () { /* ignora */ });
+  }
+  function syncAlert() {
+    if (!S.venueId) return;
+    S.alerts[S.venueId] = S.responses.filter(function (r) { return r.status === 'new' && r.rating && r.rating <= 2; }).length;
   }
   function loadVenueData() {
     if (!S.venueId) return Promise.resolve();
@@ -267,7 +281,8 @@
     S.venues.forEach(function (v) { (v.owner_id === myId() ? mine : others).push(v); });
     function opt(v, withOwner) {
       var who = withOwner && S.owners[v.owner_id] ? ' — ' + S.owners[v.owner_id] : '';
-      return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name + who) + '</option>';
+      var n = S.alerts[v.id] ? '  ⚠ ' + S.alerts[v.id] : '';
+      return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name + who + n) + '</option>';
     }
     var opts = others.length
       ? (mine.length ? '<optgroup label="I miei locali">' + mine.map(function (v) { return opt(v, false); }).join('') + '</optgroup>' : '') +
@@ -281,7 +296,9 @@
     var items = [['answers', '★', 'Risposte'], ['questions', '☰', 'Domande'], ['venue', '⚙', 'Locale']];
     if (S.isAdmin) items.push(['admin', '🔑', 'Admin']);
     return '<nav class="tabs">' + items.map(function (t) {
-      return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '"><span class="ic">' + t[1] + '</span>' + t[2] + '</button>';
+      var n = t[0] === 'answers' ? (S.alerts[S.venueId] || 0) : 0;
+      var badge = n > 0 ? '<span class="badge">' + (n > 9 ? '9+' : n) + '</span>' : '';
+      return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '"><span class="ic">' + t[1] + badge + '</span>' + t[2] + '</button>';
     }).join('') + '</nav>';
   }
 
@@ -333,7 +350,12 @@
     });
 
     var ro = isReadOnly();
-    var h = roBanner() + (ro ? '' : installCard());
+    var nAlert = S.alerts[S.venueId] || 0;
+    var alertBox = nAlert > 0
+      ? '<div class="msg err"><div class="spread"><b>⚠ ' + nAlert + (nAlert === 1 ? ' parere negativo da leggere' : ' pareri negativi da leggere') + '</b>' +
+        '<button class="btn small" id="showNeg">Mostra</button></div></div>'
+      : '';
+    var h = roBanner() + alertBox + (ro ? '' : installCard());
     h += '<div class="stat-grid" style="margin-bottom:12px">' +
       '<div class="stat"><b>' + rs.length + '</b><span>risposte</span></div>' +
       '<div class="stat"><b>' + (avg == null ? '–' : avg.toFixed(1).replace('.', ',')) + '</b><span>voto medio</span></div>' +
@@ -511,6 +533,7 @@
     };
 
     // risposte
+    if ((el = document.getElementById('showNeg'))) el.onclick = function () { S.filter = 'neg'; render(); };
     Array.prototype.forEach.call(document.querySelectorAll('[data-filter]'), function (b) {
       b.onclick = function () { S.filter = b.getAttribute('data-filter'); render(); };
     });
@@ -522,6 +545,7 @@
           guard(sb.from('responses').update({ status: st }).eq('id', id).then(function (r) {
             if (r.error) throw r.error;
             S.responses.forEach(function (x) { if (x.id === id) x.status = st; });
+            syncAlert();
             render();
           }));
         };
@@ -532,6 +556,7 @@
         guard(sb.from('responses').delete().eq('id', id).then(function (r) {
           if (r.error) throw r.error;
           S.responses = S.responses.filter(function (x) { return x.id !== id; });
+          syncAlert();
           render();
         }));
       };
@@ -759,6 +784,25 @@
       if (r.error) throw r.error; return loadCodes();
     }).then(function () { render(); toast(qty === 1 ? 'Codice creato' : qty + ' codici creati'); })).then(function () { btn.disabled = false; });
   }
+
+  // ---------- aggiornamento automatico ----------
+  function paintBadge() {
+    var ic = document.querySelector('.tabs [data-tab="answers"] .ic');
+    if (!ic) return;
+    var old = ic.querySelector('.badge'); if (old) old.remove();
+    var n = S.alerts[S.venueId] || 0;
+    if (n > 0) { var b = document.createElement('span'); b.className = 'badge'; b.textContent = n > 9 ? '9+' : n; ic.appendChild(b); }
+  }
+  function refresh() {
+    if (!S.session || S.recovery || S.editing || S.delVenue || !S.venueId) return;
+    var onAnswers = S.tab === 'answers';
+    Promise.all([loadAlerts(), onAnswers ? loadVenueData() : null]).then(function () {
+      if (S.editing || S.delVenue) return;
+      if (onAnswers && S.tab === 'answers') render(); else paintBadge();
+    });
+  }
+  setInterval(function () { if (!document.hidden) refresh(); }, 60000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
 
   // ---------- avvio ----------
   window.addEventListener('beforeinstallprompt', function (e) {

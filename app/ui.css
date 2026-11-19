@@ -170,3 +170,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); outl
 .yn button { flex: 1; text-align: center; }
 .thanks { text-align: center; padding: 40px 10px; }
 .thanks .big { font-size: 56px; }
+
+.tabs button .ic { position: relative; }
+.badge {
+  position: absolute; top: -6px; right: -16px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
