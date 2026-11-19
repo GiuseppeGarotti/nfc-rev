@@ -182,6 +182,7 @@
       '<p style="text-align:center"><button class="chip" id="switchAuth">' + (reg ? 'Ho già un account: accedi' : 'Ho un codice invito: registrati') + '</button></p>' +
       (reg ? '' : '<p style="text-align:center"><button class="chip" id="forgotLink">Password dimenticata?</button></p>') +
       '</div>';
+    eyeify();
     var fl = document.getElementById('forgotLink');
     if (fl) fl.onclick = function () { S.authMode = 'forgot'; S.authMsg = null; render(); };
     document.getElementById('switchAuth').onclick = function () {
@@ -227,6 +228,31 @@
     };
   }
 
+  // aggiunge l'occhio "mostra/nascondi" a ogni campo password della schermata
+  var EYE_ON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19.8 19.8 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.9 10.9 0 0 1 12 4c7 0 11 7 11 7a19.9 19.9 0 0 1-3.17 4.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+  function eyeify() {
+    Array.prototype.forEach.call($app.querySelectorAll('input[type="password"]'), function (inp) {
+      var wrap = document.createElement('div');
+      wrap.className = 'pwwrap';
+      inp.parentNode.insertBefore(wrap, inp);
+      wrap.appendChild(inp);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'eye';
+      btn.setAttribute('aria-label', 'Mostra password');
+      btn.innerHTML = EYE_ON;
+      btn.onclick = function () {
+        var show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        btn.innerHTML = show ? EYE_OFF : EYE_ON;
+        btn.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password');
+        inp.focus();
+      };
+      wrap.appendChild(btn);
+    });
+  }
+
   function renderForgot() {
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
@@ -260,6 +286,7 @@
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
       '<div style="margin-top:16px"><button class="btn gold block" type="submit"' + (S.busy ? ' disabled' : '') + '>Salva la password</button></div></form></div>';
+    eyeify();
     document.getElementById('recForm').onsubmit = function (ev) {
       ev.preventDefault();
       var a = document.getElementById('np1').value, b = document.getElementById('np2').value;

@@ -177,3 +177,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); outl
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
   background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
 }
+
+.pwwrap { position: relative; }
+.pwwrap input { padding-right: 48px; }
+.pwwrap .eye {
+  position: absolute; top: 0; right: 0; height: 100%; width: 46px;
+  background: none; border: 0; color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.pwwrap .eye:active { color: var(--ink); }
