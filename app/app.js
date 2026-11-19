@@ -1,6 +1,7 @@
 (function () {
   'use strict';
 
+  var APP_VERSION = '3';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -183,6 +184,8 @@
       (reg ? '' : '<p style="text-align:center"><button class="chip" id="forgotLink">Password dimenticata?</button></p>') +
       '</div>';
     eyeify();
+    var ver = document.createElement('p'); ver.className = 'muted'; ver.style.cssText = 'text-align:center;font-size:12px'; ver.textContent = 'Versione ' + APP_VERSION;
+    $app.firstChild.appendChild(ver);
     var fl = document.getElementById('forgotLink');
     if (fl) fl.onclick = function () { S.authMode = 'forgot'; S.authMsg = null; render(); };
     document.getElementById('switchAuth').onclick = function () {
