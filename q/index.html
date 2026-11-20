@@ -120,6 +120,7 @@
         if (q.required) { render('Rispondi alle domande contrassegnate con *.'); window.scrollTo(0, 0); return; }
         continue;
       }
+      if (q.type === 'multi' && !Array.isArray(v)) v = [v];
       payload.push({ question_id: q.id, value: typeof v === 'string' && q.type === 'text' ? v.trim() : v });
     }
     if (!payload.length) { render('Rispondi ad almeno una domanda.'); window.scrollTo(0, 0); return; }
