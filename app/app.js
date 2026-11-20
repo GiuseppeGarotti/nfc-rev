@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '11';
+  var APP_VERSION = '12';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -133,17 +133,21 @@
     });
   }
   // pareri negativi (1-2 stelle) ancora "nuovi", per locale
+  // negativa = almeno una domanda a stelle con 1 o 2 stelle
+  function isNeg(r) {
+    return (r.answers || []).some(function (a) { return a.type === 'stars' && Number(a.value) <= 2; });
+  }
   function loadAlerts() {
-    return sb.from('responses').select('venue_id').eq('status', 'new').lte('rating', 2).limit(1000).then(function (r) {
+    return sb.from('responses').select('venue_id,answers').eq('status', 'new').limit(1000).then(function (r) {
       if (r.error) return;
       var a = {};
-      (r.data || []).forEach(function (x) { a[x.venue_id] = (a[x.venue_id] || 0) + 1; });
+      (r.data || []).forEach(function (x) { if (isNeg(x)) a[x.venue_id] = (a[x.venue_id] || 0) + 1; });
       S.alerts = a;
     }, function () { /* ignora */ });
   }
   function syncAlert() {
     if (!S.venueId) return;
-    S.alerts[S.venueId] = S.responses.filter(function (r) { return r.status === 'new' && r.rating && r.rating <= 2; }).length;
+    S.alerts[S.venueId] = S.responses.filter(function (r) { return r.status === 'new' && isNeg(r); }).length;
   }
   function loadVenueData() {
     if (!S.venueId) return Promise.resolve();
@@ -175,7 +179,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div>' +
       '<p class="muted">Feedback dei tuoi clienti, semplice.</p></div>' +
       '<form class="card" id="authForm" autocomplete="on">' +
       '<h2>' + (reg ? 'Crea il tuo account' : 'Accedi') + '</h2>' + msg +
@@ -266,7 +270,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div></div>' +
       '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
       '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
       '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
@@ -290,7 +294,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div></div>' +
       '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
@@ -326,7 +330,7 @@
     } else if (S.venues.length === 1) {
       mid = '<span class="venue-name">' + esc(S.venues[0].name) + '</span>';
     } else mid = '<span class="grow"></span>';
-    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=11" alt="NFC REV">' + mid +
+    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=12" alt="NFC REV">' + mid +
       '<button class="logout" id="logout">Esci</button></div></div>';
   }
   function tabsBar() {
@@ -381,7 +385,7 @@
 
     var filtered = rs.filter(function (r) {
       if (S.filter === 'new') return r.status === 'new';
-      if (S.filter === 'neg') return r.rating && r.rating <= 2;
+      if (S.filter === 'neg') return isNeg(r);
       return true;
     });
 
