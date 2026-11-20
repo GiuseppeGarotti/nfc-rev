@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '9';
+  var APP_VERSION = '10';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -12,8 +12,8 @@
   var TYPES = {
     stars: 'Stelle (1-5)',
     yesno: 'Sì / No',
-    single: 'Scelta singola',
-    multi: 'Scelta multipla',
+    single: 'Scelta multipla (una risposta)',
+    multi: 'Scelta multipla (una risposta)',
     text: 'Testo libero'
   };
 
@@ -175,7 +175,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div>' +
       '<p class="muted">Feedback dei tuoi clienti, semplice.</p></div>' +
       '<form class="card" id="authForm" autocomplete="on">' +
       '<h2>' + (reg ? 'Crea il tuo account' : 'Accedi') + '</h2>' + msg +
@@ -266,7 +266,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div></div>' +
       '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
       '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
       '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
@@ -290,7 +290,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div></div>' +
       '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
@@ -326,7 +326,7 @@
     } else if (S.venues.length === 1) {
       mid = '<span class="venue-name">' + esc(S.venues[0].name) + '</span>';
     } else mid = '<span class="grow"></span>';
-    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=9" alt="NFC REV">' + mid +
+    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=10" alt="NFC REV">' + mid +
       '<button class="logout" id="logout">Esci</button></div></div>';
   }
   function tabsBar() {
@@ -467,7 +467,7 @@
       '<div class="spread"><h2>' + (q.id ? 'Modifica domanda' : 'Nuova domanda') + '</h2><button class="chip" id="mclose">Chiudi</button></div>' +
       '<label for="qText">Testo della domanda</label><textarea id="qText" maxlength="200" style="min-height:70px">' + esc(q.text) + '</textarea>' +
       '<label for="qType">Tipo di risposta</label><select id="qType">' +
-      Object.keys(TYPES).map(function (k) { return '<option value="' + k + '"' + (q.type === k ? ' selected' : '') + '>' + TYPES[k] + '</option>'; }).join('') + '</select>' +
+      Object.keys(TYPES).filter(function (k) { return k !== 'multi'; }).map(function (k) { return '<option value="' + k + '"' + ((q.type === 'multi' ? 'single' : q.type) === k ? ' selected' : '') + '>' + TYPES[k] + '</option>'; }).join('') + '</select>' +
       '<div id="optsBox"' + (needsOpts ? '' : ' class="hidden"') + '><label for="qOpts">Opzioni (una per riga)</label>' +
       '<textarea id="qOpts" placeholder="Es.&#10;Ottimo&#10;Buono&#10;Da migliorare">' + esc((q.options || []).join('\n')) + '</textarea></div>' +
       '<label class="check"><input type="checkbox" id="qReq"' + (q.required ? ' checked' : '') + '> Risposta obbligatoria</label>' +

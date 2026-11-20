@@ -57,7 +57,7 @@
       } else if (q.type === 'yesno') {
         h += '<div class="yn"><button type="button" data-yn="si" class="' + (v === 'si' ? 'on' : '') + '">Sì</button>' +
           '<button type="button" data-yn="no" class="' + (v === 'no' ? 'on' : '') + '">No</button></div>';
-      } else if (q.type === 'single') {
+      } else if (q.type === 'single' || q.type === 'multi') {
         h += '<div class="opts">' + (q.options || []).map(function (o, k) {
           return '<button type="button" data-opt="' + k + '" class="' + (v === o ? 'on' : '') + '">' + esc(o) + '</button>';
         }).join('') + '</div>';
