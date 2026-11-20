@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '3';
+  var APP_VERSION = '4';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -31,6 +31,7 @@
     isAdmin: false,
     owners: {},
     alerts: {},
+    lastInvite: null,
     codes: [],
     editing: null,
     delVenue: false,
@@ -177,7 +178,7 @@
       '<label for="pw">Password' + (reg ? ' (almeno 8 caratteri)' : '') + '</label>' +
       '<input id="pw" type="password" required minlength="' + (reg ? 8 : 1) + '" autocomplete="' + (reg ? 'new-password' : 'current-password') + '">' +
       (reg ? '<label for="code">Codice invito</label><input id="code" type="text" required autocapitalize="characters" autocomplete="off" placeholder="NFC-XXXX-XXXX">' +
-        '<p class="muted" style="margin-top:6px">Il codice ti viene dato insieme al supporto NFC REV.</p>' : '') +
+        '<p class="muted" style="margin-top:6px">Usa la stessa email che hai dato a NFC REV. Il codice ti viene consegnato insieme al supporto.</p>' : '') +
       '<div style="margin-top:16px"><button class="btn gold block" type="submit"' + (S.busy ? ' disabled' : '') + '>' + (reg ? 'Registrati' : 'Entra') + '</button></div>' +
       '</form>' +
       '<p style="text-align:center"><button class="chip" id="switchAuth">' + (reg ? 'Ho già un account: accedi' : 'Ho un codice invito: registrati') + '</button></p>' +
@@ -203,7 +204,7 @@
         p = sb.auth.signUp({ email: email, password: pw, options: { data: { invite_code: code } } }).then(function (r) {
           if (r.error) {
             if (/database error|invite|saving new user/i.test(r.error.message)) {
-              throw new Error('Codice invito non valido o già usato.');
+              throw new Error('Codice non valido, già usato, oppure email diversa da quella che hai dato a NFC REV.');
             }
             throw r.error;
           }
@@ -507,11 +508,21 @@
 
   function viewAdmin() {
     var myEmail = (S.session && S.session.user && S.session.user.email) || '';
-    var h = '<div class="card"><h2>Nuovo cliente: codice invito</h2><p class="muted">Un codice vale per un solo account. Alla registrazione il cliente trova già il suo locale pronto.</p>' +
+    var li = S.lastInvite;
+    var h = '';
+    if (li) {
+      h += '<div class="card" style="border-color:var(--gold)"><h2>Pronto per ' + esc(li.name) + '</h2>' +
+        '<p class="muted" style="margin-top:6px">Il locale è già nel tuo account: prendi link e QR, poi consegna il codice al cliente.</p>' +
+        '<label>Codice invito</label><div class="linkbox"><input type="text" readonly value="' + esc(li.code) + '" class="code"><button class="btn small" id="liCopy">Copia</button></div>' +
+        '<p class="muted" style="margin-top:8px">Il cliente deve registrarsi con questa email: <b>' + esc(li.email) + '</b></p>' +
+        '<div class="row wrap-r" style="margin-top:10px"><button class="btn gold small" id="liGo">Apri il locale (link e QR)</button>' +
+        '<button class="btn line small" id="liClose">Chiudi</button></div></div>';
+    }
+    h += '<div class="card"><h2>Nuovo cliente</h2><p class="muted">Crei il locale e il codice. Il locale resta nel tuo account finché il cliente non si registra con la sua email e il codice.</p>' +
       '<label for="cVenue">Nome del locale</label><input id="cVenue" type="text" maxlength="80" placeholder="Es. Bar Centrale">' +
-      '<label for="cQty">Quanti codici?</label><select id="cQty"><option>1</option><option>5</option><option>10</option><option>20</option></select>' +
-      '<p class="muted" style="margin-top:6px">Se ne crei più di uno, tutti avranno lo stesso nome del locale.</p>' +
-      '<div style="margin-top:12px"><button class="btn gold block" id="cGen">Genera</button></div></div>' +
+      '<label for="cEmail">Email del cliente</label><input id="cEmail" type="email" placeholder="nome@esempio.it" autocapitalize="off" inputmode="email">' +
+      '<div id="cMsg"></div>' +
+      '<div style="margin-top:12px"><button class="btn gold block" id="cGen">Crea locale e codice</button></div></div>' +
       '<div class="card"><h2>Aggiungi un locale a un account</h2><p class="muted">Per un cliente che ha già un account (anche il tuo) e vuole un altro locale.</p>' +
       '<label for="aEmail">Email dell\'account</label><input id="aEmail" type="email" value="' + esc(myEmail) + '">' +
       '<label for="aName">Nome del nuovo locale</label><input id="aName" type="text" maxlength="80">' +
@@ -521,6 +532,7 @@
       var st = c.used_by || c.used_at ? '<span class="pill resolved">Usato</span>' : (c.revoked ? '<span class="pill off">Annullato</span>' : '<span class="pill new">Libero</span>');
       h += '<div class="card" data-code="' + esc(c.code) + '"><div class="spread"><span class="code">' + esc(c.code) + '</span>' + st + '</div>' +
         (c.venue_name ? '<div><b>' + esc(c.venue_name) + '</b></div>' : '') +
+        (c.email ? '<div class="muted">Per: ' + esc(c.email) + '</div>' : '') +
         (c.note ? '<div class="muted">' + esc(c.note) + '</div>' : '') +
         (c.used_email ? '<div class="muted">Usato da ' + esc(c.used_email) + ' · ' + esc(fmtDate(c.used_at)) + '</div>' : '') +
         '<div class="row" style="margin-top:8px"><button class="btn line small" data-ccopy="1">Copia</button>' +
@@ -634,6 +646,12 @@
 
     // admin
     if ((el = document.getElementById('cGen'))) el.onclick = genCodes;
+    if ((el = document.getElementById('liCopy'))) el.onclick = function () { copyText(S.lastInvite.code); };
+    if ((el = document.getElementById('liClose'))) el.onclick = function () { S.lastInvite = null; render(); };
+    if ((el = document.getElementById('liGo'))) el.onclick = function () {
+      S.venueId = S.lastInvite.venue_id; lsSet('nfcrev_venue', S.venueId); S.tab = 'venue';
+      guard(loadVenueData().then(function () { render(); window.scrollTo(0, 0); }));
+    };
     var addBtn = document.getElementById('aAdd');
     if (addBtn) addBtn.onclick = function () {
       var email = document.getElementById('aEmail').value.trim();
@@ -799,20 +817,26 @@
   }
 
   function genCodes() {
-    var qty = parseInt(document.getElementById('cQty').value, 10) || 1;
-    var venueName = document.getElementById('cVenue').value.trim();
-    if (!venueName) { toast('Scrivi il nome del locale'); return; }
-    var alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    function part() {
-      var arr = new Uint32Array(4); crypto.getRandomValues(arr);
-      return Array.prototype.map.call(arr, function (n) { return alpha[n % alpha.length]; }).join('');
-    }
-    var rows = [];
-    for (var i = 0; i < qty; i++) rows.push({ code: 'NFC-' + part() + '-' + part(), venue_name: venueName });
+    var name = document.getElementById('cVenue').value.trim();
+    var email = document.getElementById('cEmail').value.trim();
+    var out = document.getElementById('cMsg');
+    if (!name || !email) { out.innerHTML = '<div class="msg err">Scrivi il nome del locale e l\'email del cliente.</div>'; return; }
     var btn = document.getElementById('cGen'); btn.disabled = true;
-    guard(sb.from('invite_codes').insert(rows).then(function (r) {
-      if (r.error) throw r.error; return loadCodes();
-    }).then(function () { render(); toast(qty === 1 ? 'Codice creato' : qty + ' codici creati'); })).then(function () { btn.disabled = false; });
+    sb.rpc('admin_create_invite', { p_email: email, p_venue_name: name }).then(function (r) {
+      if (r.error) throw r.error;
+      S.lastInvite = { code: r.data.code, venue_id: r.data.venue_id, email: email.toLowerCase(), name: name };
+      return loadAll();
+    }).then(function () { return loadCodes(); })
+      .then(function () { render(); toast('Locale e codice creati'); })
+      .catch(function (e) {
+        btn.disabled = false;
+        var m = (e && e.message) || '';
+        var t = /EMAIL_ALREADY_REGISTERED/.test(m) ? 'Questa email ha già un account: usa "Aggiungi un locale a un account".'
+          : /EMAIL_INVALID/.test(m) ? 'L\'email non sembra valida.'
+          : /function .*admin_create_invite|schema cache/i.test(m) ? 'Manca l\'aggiornamento del database: esegui il file codice-con-email.sql.'
+          : errText(e);
+        out.innerHTML = '<div class="msg err">' + esc(t) + '</div>';
+      });
   }
 
   // ---------- aggiornamento automatico ----------
