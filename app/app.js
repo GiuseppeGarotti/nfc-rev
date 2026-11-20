@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '4';
+  var APP_VERSION = '5';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -84,6 +84,11 @@
     var v = currentVenue();
     var who = v && S.owners[v.owner_id];
     return '<div class="msg info">Stai modificando le domande del locale di un cliente' + (who ? ' (' + esc(who) + ')' : '') + '. Le modifiche valgono subito per i suoi clienti.</div>';
+  }
+  function adminVBanner() {
+    var v = currentVenue();
+    var who = v && S.owners[v.owner_id];
+    return '<div class="msg info">Stai gestendo il locale di un cliente' + (who ? ' (' + esc(who) + ')' : '') + '. Le modifiche valgono anche per lui.</div>';
   }
   function isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
@@ -486,8 +491,8 @@
     var v = currentVenue();
     if (!v) return viewNoVenue();
     var url = formUrl(v.slug);
-    var ro = isReadOnly();
-    return roBanner() + '<div class="card"><h2>Link e QR code del questionario</h2>' +
+    var ro = isReadOnly() && !S.isAdmin;
+    return (isReadOnly() ? (S.isAdmin ? adminVBanner() : roBanner()) : '') + '<div class="card"><h2>Link e QR code del questionario</h2>' +
       '<p class="muted">Programma questo link sul chip NFC e stampa il QR code per il supporto.</p>' +
       '<div class="linkbox"><input type="text" readonly id="linkOut" value="' + esc(url) + '"><button class="btn small" id="copyLink">Copia</button></div>' +
       '<div class="qa"><div id="qrBox"></div><div class="row wrap-r" style="justify-content:center">' +
@@ -779,8 +784,9 @@
     if (!name) { out.innerHTML = '<div class="msg err">Il nome non può essere vuoto.</div>'; return; }
     if (g && !/^https:\/\//i.test(g)) { out.innerHTML = '<div class="msg err">Il link Google deve iniziare con https://</div>'; return; }
     var btn = document.getElementById('vSave'); btn.disabled = true;
-    sb.from('venues').update({ name: name, google_review_url: g || null, thanks_text: th || null }).eq('id', v.id).then(function (r) {
+    sb.from('venues').update({ name: name, google_review_url: g || null, thanks_text: th || null }).eq('id', v.id).select('id').then(function (r) {
       if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw new Error('Modifica non riuscita: mancano i permessi. Hai eseguito il file SQL?');
       v.name = name; v.google_review_url = g || null; v.thanks_text = th || null;
       render(); toast('Salvato');
     }).catch(function (e) { btn.disabled = false; out.innerHTML = '<div class="msg err">' + esc(errText(e)) + '</div>'; });
