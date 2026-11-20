@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '7';
+  var APP_VERSION = '8';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -532,8 +532,8 @@
       '<label for="aEmail">Email dell\'account</label><input id="aEmail" type="email" value="' + esc(myEmail) + '">' +
       '<label for="aName">Nome del nuovo locale</label><input id="aName" type="text" maxlength="80">' +
       '<div id="aMsg"></div><div style="margin-top:12px"><button class="btn line block" id="aAdd">Aggiungi locale</button></div></div>';
-    // si vedono solo i codici liberi e quelli usati da un account ancora attivo
-    var shown = S.codes.filter(function (c) { return !c.revoked && !(c.used_at && !c.used_by); });
+    // si vedono solo i codici liberi e quelli usati da un account ancora attivo, con il locale ancora esistente
+    var shown = S.codes.filter(function (c) { return !c.revoked && !(c.used_at && !c.used_by) && !(c.email && !c.venue_id); });
     if (!shown.length) h += '<div class="empty">Nessun codice.</div>';
     shown.forEach(function (c) {
       var st = c.used_by || c.used_at ? '<span class="pill resolved">Usato</span>' : (c.revoked ? '<span class="pill off">Annullato</span>' : '<span class="pill new">Libero</span>');
