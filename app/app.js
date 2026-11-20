@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '10';
+  var APP_VERSION = '11';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -175,7 +175,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div>' +
       '<p class="muted">Feedback dei tuoi clienti, semplice.</p></div>' +
       '<form class="card" id="authForm" autocomplete="on">' +
       '<h2>' + (reg ? 'Crea il tuo account' : 'Accedi') + '</h2>' + msg +
@@ -266,7 +266,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div></div>' +
       '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
       '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
       '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
@@ -290,7 +290,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=10" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=11" alt="NFC REV"></div></div>' +
       '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
@@ -326,7 +326,7 @@
     } else if (S.venues.length === 1) {
       mid = '<span class="venue-name">' + esc(S.venues[0].name) + '</span>';
     } else mid = '<span class="grow"></span>';
-    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=10" alt="NFC REV">' + mid +
+    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=11" alt="NFC REV">' + mid +
       '<button class="logout" id="logout">Esci</button></div></div>';
   }
   function tabsBar() {
@@ -381,17 +381,15 @@
 
     var filtered = rs.filter(function (r) {
       if (S.filter === 'new') return r.status === 'new';
-      if (S.filter === 'open') return r.status !== 'resolved';
       if (S.filter === 'neg') return r.rating && r.rating <= 2;
       return true;
     });
 
     var ro = isReadOnly();
-    var nAlert = S.alerts[S.venueId] || 0;
-    var alertBox = nAlert > 0
-      ? '<div class="msg err"><div class="spread"><b>⚠ ' + nAlert + (nAlert === 1 ? ' parere negativo da leggere' : ' pareri negativi da leggere') + '</b>' +
-        '<button class="btn small" id="showNeg">Mostra</button></div></div>'
+    var alertBox = rs.length
+      ? '<button class="statbanner" id="showStats"><span>📊 <b>Percentuali delle risposte</b><br><small>Come hanno risposto i clienti a ogni domanda</small></span><span class="chev">›</span></button>'
       : '';
+    if (S.statsView) return statsView();
     var h = roBanner() + alertBox + (ro ? '' : installCard());
     h += '<div class="stat-grid" style="margin-bottom:12px">' +
       '<div class="stat"><b>' + rs.length + '</b><span>risposte</span></div>' +
@@ -406,7 +404,7 @@
       h += '</div>';
     }
 
-    var chips = [['all', 'Tutte'], ['new', 'Nuove'], ['open', 'Non risolte'], ['neg', 'Negative']];
+    var chips = [['all', 'Tutte'], ['new', 'Nuove'], ['neg', 'Negative']];
     h += '<div class="chips">' + chips.map(function (c) {
       return '<button class="chip' + (S.filter === c[0] ? ' on' : '') + '" data-filter="' + c[0] + '">' + c[1] + '</button>';
     }).join('') + '</div>';
@@ -424,8 +422,43 @@
       });
       if (!ro) h += '<div class="row wrap-r" style="margin-top:12px">' +
         (r.status !== 'read' && r.status !== 'resolved' ? '<button class="btn line small" data-st="read">Segna letta</button>' : '') +
-        (r.status !== 'resolved' ? '<button class="btn line small" data-st="resolved">Risolta</button>' : '<button class="btn line small" data-st="new">Riapri</button>') +
+        (r.status === 'resolved' ? '<button class="btn line small" data-st="new">Riapri</button>' : '') +
         '<button class="btn danger small" data-del="1">Elimina</button></div>';
+      h += '</div>';
+    });
+    return h;
+  }
+  function statsView() {
+    var rs = S.responses, n = rs.length;
+    function pct(x, tot) { return tot ? Math.round(x / tot * 100) : 0; }
+    function row(label, cnt, tot) {
+      var p = pct(cnt, tot);
+      return '<div class="pct-row"><div class="spread"><span>' + label + '</span><b>' + p + '%</b></div><div class="bar"><i style="width:' + p + '%"></i></div><div class="muted" style="font-size:12px">' + cnt + (cnt === 1 ? ' risposta' : ' risposte') + '</div></div>';
+    }
+    var h = '<button class="btn line small" id="statsBack">← Indietro</button>' +
+      '<h2 style="margin:14px 0 4px">Percentuali delle risposte</h2><p class="muted">Su ' + n + (n === 1 ? ' questionario ricevuto.' : ' questionari ricevuti.') + '</p>';
+    S.questions.forEach(function (q) {
+      var vals = [];
+      rs.forEach(function (r) {
+        (r.answers || []).forEach(function (a) { if (a.question_id === q.id) vals.push(a.value); });
+      });
+      var tot = vals.length;
+      h += '<div class="card"><h3>' + esc(q.text) + '</h3><div class="muted" style="margin:2px 0 8px">' + tot + ' su ' + n + ' hanno risposto</div>';
+      if (!tot) { h += '<div class="muted">Nessuna risposta.</div>'; }
+      else if (q.type === 'stars') {
+        var avg = vals.reduce(function (a, v) { return a + Number(v); }, 0) / tot;
+        for (var k = 5; k >= 1; k--) h += row(k + ' ★', vals.filter(function (v) { return Number(v) === k; }).length, tot);
+        h += '<div class="muted" style="margin-top:6px">Voto medio: <b>' + avg.toFixed(1).replace('.', ',') + '</b></div>';
+      } else if (q.type === 'yesno') {
+        h += row('Sì', vals.filter(function (v) { return v === 'si'; }).length, tot) + row('No', vals.filter(function (v) { return v === 'no'; }).length, tot);
+      } else if (q.type === 'single' || q.type === 'multi') {
+        (q.options || []).forEach(function (o) {
+          var c = vals.filter(function (v) { return Array.isArray(v) ? v.indexOf(o) >= 0 : v === o; }).length;
+          h += row(esc(o), c, tot);
+        });
+      } else {
+        h += '<div class="muted">Domanda a testo libero: le risposte sono nella lista.</div>';
+      }
       h += '</div>';
     });
     return h;
@@ -562,12 +595,12 @@
     };
     var sel = document.getElementById('venueSel');
     if (sel) sel.onchange = function () {
-      S.venueId = sel.value; lsSet('nfcrev_venue', S.venueId);
+      S.venueId = sel.value; S.statsView = false; lsSet('nfcrev_venue', S.venueId);
       guard(loadVenueData().then(render));
     };
     Array.prototype.forEach.call(document.querySelectorAll('.tabs [data-tab]'), function (b) {
       b.onclick = function () {
-        S.tab = b.getAttribute('data-tab');
+        S.tab = b.getAttribute('data-tab'); S.statsView = false;
         if (S.tab === 'admin') guard(loadCodes().then(render)); else render();
         window.scrollTo(0, 0);
       };
@@ -582,7 +615,8 @@
     };
 
     // risposte
-    if ((el = document.getElementById('showNeg'))) el.onclick = function () { S.filter = 'neg'; render(); };
+    if ((el = document.getElementById('showStats'))) el.onclick = function () { S.statsView = true; render(); window.scrollTo(0, 0); };
+    if ((el = document.getElementById('statsBack'))) el.onclick = function () { S.statsView = false; render(); window.scrollTo(0, 0); };
     Array.prototype.forEach.call(document.querySelectorAll('[data-filter]'), function (b) {
       b.onclick = function () { S.filter = b.getAttribute('data-filter'); render(); };
     });

@@ -193,3 +193,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); outl
 .venue-name { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .splash { position: fixed; inset: 0; background: var(--dark); display: flex; align-items: center; justify-content: center; }
 .splash img { width: 128px; height: 128px; border-radius: 28px; }
+
+.statbanner { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; font: inherit; color: var(--ink); background: #fbf1d8; border: 1px solid var(--gold); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; cursor: pointer; }
+.statbanner small { color: var(--muted); font-size: 13px; }
+.statbanner .chev { font-size: 26px; color: var(--gold-deep); }
+.pct-row { margin: 10px 0; }
+.pct-row .bar { margin: 4px 0 2px; }
