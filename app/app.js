@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '5';
+  var APP_VERSION = '7';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -532,8 +532,10 @@
       '<label for="aEmail">Email dell\'account</label><input id="aEmail" type="email" value="' + esc(myEmail) + '">' +
       '<label for="aName">Nome del nuovo locale</label><input id="aName" type="text" maxlength="80">' +
       '<div id="aMsg"></div><div style="margin-top:12px"><button class="btn line block" id="aAdd">Aggiungi locale</button></div></div>';
-    if (!S.codes.length) h += '<div class="empty">Nessun codice.</div>';
-    S.codes.forEach(function (c) {
+    // si vedono solo i codici liberi e quelli usati da un account ancora attivo
+    var shown = S.codes.filter(function (c) { return !c.revoked && !(c.used_at && !c.used_by); });
+    if (!shown.length) h += '<div class="empty">Nessun codice.</div>';
+    shown.forEach(function (c) {
       var st = c.used_by || c.used_at ? '<span class="pill resolved">Usato</span>' : (c.revoked ? '<span class="pill off">Annullato</span>' : '<span class="pill new">Libero</span>');
       h += '<div class="card" data-code="' + esc(c.code) + '"><div class="spread"><span class="code">' + esc(c.code) + '</span>' + st + '</div>' +
         (c.venue_name ? '<div><b>' + esc(c.venue_name) + '</b></div>' : '') +
@@ -541,7 +543,7 @@
         (c.note ? '<div class="muted">' + esc(c.note) + '</div>' : '') +
         (c.used_email ? '<div class="muted">Usato da ' + esc(c.used_email) + ' · ' + esc(fmtDate(c.used_at)) + '</div>' : '') +
         '<div class="row" style="margin-top:8px"><button class="btn line small" data-ccopy="1">Copia</button>' +
-        (!c.used_at && !c.revoked ? '<button class="btn danger small" data-crev="1">Annulla</button>' : '') + '</div></div>';
+        (!c.used_at && !c.used_by ? '<button class="btn danger small" data-crev="1">Annulla</button>' : '') + '</div></div>';
     });
     return h;
   }
@@ -678,13 +680,29 @@
       var c = card.querySelector('[data-ccopy]');
       if (c) c.onclick = function () { copyText(code); };
       var r = card.querySelector('[data-crev]');
-      if (r) r.onclick = function () {
-        if (!confirm('Annullare il codice ' + code + '?')) return;
-        guard(sb.from('invite_codes').update({ revoked: true }).eq('code', code).then(function (x) {
-          if (x.error) throw x.error; return loadCodes();
-        }).then(render));
-      };
+      if (r) twoTap(r, 'Tocca ancora per annullare', function () { deleteCodes([code]); });
     });
+  }
+
+  // pulsante a doppio tocco: il primo tocco chiede conferma, il secondo esegue
+  function twoTap(btn, armedLabel, fn) {
+    var orig = btn.textContent, timer = null;
+    btn.onclick = function () {
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1'); btn.textContent = armedLabel;
+        timer = setTimeout(function () { btn.removeAttribute('data-armed'); btn.textContent = orig; }, 3500);
+        return;
+      }
+      clearTimeout(timer); btn.disabled = true; fn();
+    };
+  }
+  function deleteCodes(codes) {
+    if (!codes.length) return;
+    guard(sb.from('invite_codes').delete().in('code', codes).select('code').then(function (r) {
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw new Error('Eliminazione non riuscita: mancano i permessi.');
+      return loadCodes();
+    }).then(function () { render(); toast('Codice annullato'); })).then(function () { render(); });
   }
 
   function bindDelete() {
