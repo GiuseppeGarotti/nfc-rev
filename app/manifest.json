@@ -1,6 +1,6 @@
 {
-  "name": "NFC REV Feedback",
-  "short_name": "Feedback",
+  "name": "NFC REV",
+  "short_name": "NFC REV",
   "description": "Gestisci le domande e le risposte dei tuoi clienti",
   "start_url": "./",
   "scope": "./",

@@ -186,3 +186,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--gold); outl
   display: flex; align-items: center; justify-content: center;
 }
 .pwwrap .eye:active { color: var(--ink); }
+
+.brand-img { height: 40px; width: auto; display: block; flex: none; }
+.brand-box { display: inline-block; background: var(--dark); border-radius: 14px; padding: 10px 22px; }
+.brand-box img { height: 64px; width: auto; display: block; }
+.venue-name { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.splash { position: fixed; inset: 0; background: var(--dark); display: flex; align-items: center; justify-content: center; }
+.splash img { width: 128px; height: 128px; border-radius: 28px; }

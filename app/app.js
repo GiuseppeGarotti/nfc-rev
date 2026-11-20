@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '8';
+  var APP_VERSION = '9';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -163,7 +163,7 @@
 
   // ---------- render ----------
   function render() {
-    if (!S.ready) { $app.innerHTML = '<div class="wrap"><p class="muted">Caricamento…</p></div>'; return; }
+    if (!S.ready) { $app.innerHTML = '<div class="splash"><img src="icon-v3-192.png" alt="NFC REV"></div>'; return; }
     if (S.recovery && S.session) { renderRecovery(); return; }
     if (!S.session) { renderAuth(); return; }
     renderApp();
@@ -175,7 +175,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand" style="color:var(--ink);font-size:20px">NFC <b>REV</b></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div>' +
       '<p class="muted">Feedback dei tuoi clienti, semplice.</p></div>' +
       '<form class="card" id="authForm" autocomplete="on">' +
       '<h2>' + (reg ? 'Crea il tuo account' : 'Accedi') + '</h2>' + msg +
@@ -266,7 +266,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand" style="color:var(--ink);font-size:20px">NFC <b>REV</b></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div></div>' +
       '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
       '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
       '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
@@ -290,7 +290,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand" style="color:var(--ink);font-size:20px">NFC <b>REV</b></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=9" alt="NFC REV"></div></div>' +
       '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
@@ -313,19 +313,20 @@
   }
 
   function header() {
-    var mine = [], others = [];
-    S.venues.forEach(function (v) { (v.owner_id === myId() ? mine : others).push(v); });
-    function opt(v, withOwner) {
-      var who = withOwner && S.owners[v.owner_id] ? ' — ' + S.owners[v.owner_id] : '';
+    function opt(v) {
+      var dup = S.venues.filter(function (x) { return x.name === v.name; }).length > 1;
+      var who = dup && S.owners[v.owner_id] ? ' (' + S.owners[v.owner_id] + ')' : '';
       var n = S.alerts[v.id] ? '  ⚠ ' + S.alerts[v.id] : '';
       return '<option value="' + esc(v.id) + '"' + (v.id === S.venueId ? ' selected' : '') + '>' + esc(v.name + who + n) + '</option>';
     }
-    var opts = others.length
-      ? (mine.length ? '<optgroup label="I miei locali">' + mine.map(function (v) { return opt(v, false); }).join('') + '</optgroup>' : '') +
-        '<optgroup label="Locali dei clienti">' + others.map(function (v) { return opt(v, true); }).join('') + '</optgroup>'
-      : mine.map(function (v) { return opt(v, false); }).join('');
-    return '<div class="top"><div class="top-in"><span class="brand">NFC <b>REV</b></span>' +
-      (S.venues.length ? '<select id="venueSel" aria-label="Locale">' + opts + '</select>' : '<span class="grow"></span>') +
+    var mid;
+    if (S.isAdmin || S.venues.length > 1) {
+      var sorted = S.venues.slice().sort(function (x, y) { return x.name.localeCompare(y.name, 'it'); });
+      mid = '<select id="venueSel" aria-label="Locale">' + sorted.map(opt).join('') + '</select>';
+    } else if (S.venues.length === 1) {
+      mid = '<span class="venue-name">' + esc(S.venues[0].name) + '</span>';
+    } else mid = '<span class="grow"></span>';
+    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=9" alt="NFC REV">' + mid +
       '<button class="logout" id="logout">Esci</button></div></div>';
   }
   function tabsBar() {
@@ -496,7 +497,6 @@
       '<p class="muted">Programma questo link sul chip NFC e stampa il QR code per il supporto.</p>' +
       '<div class="linkbox"><input type="text" readonly id="linkOut" value="' + esc(url) + '"><button class="btn small" id="copyLink">Copia</button></div>' +
       '<div class="qa"><div id="qrBox"></div><div class="row wrap-r" style="justify-content:center">' +
-      '<button class="btn line small" id="dlQr">Scarica QR (PNG)</button>' +
       '<a class="btn line small" href="' + esc(url) + '" target="_blank" rel="noopener">Apri</a></div></div></div>' +
       (ro ? '<div class="card"><h2>' + esc(v.name) + '</h2><p class="muted">Link recensione Google: ' + esc(v.google_review_url || 'non impostato') + '</p></div>' : '') +
       (ro ? '' : '<div class="card"><h2>Impostazioni del locale</h2>' +
@@ -643,7 +643,6 @@
     // locale
     if ((el = document.getElementById('copyLink'))) el.onclick = function () { copyText(document.getElementById('linkOut').value); };
     if (document.getElementById('qrBox')) drawQr();
-    if ((el = document.getElementById('dlQr'))) el.onclick = downloadQr;
     if ((el = document.getElementById('vSave'))) el.onclick = saveVenue;
     if ((el = document.getElementById('vDelete'))) el.onclick = function () {
       S.delVenue = true; render();

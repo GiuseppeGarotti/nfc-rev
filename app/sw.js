@@ -1,5 +1,5 @@
 // Service worker minimo: serve a rendere l'app installabile. Rete per prima, cache come ripiego.
-var CACHE = 'nfcrev-app-v2';
+var CACHE = 'nfcrev-app-v3';
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (ks) {
