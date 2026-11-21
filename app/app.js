@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '12';
+  var APP_VERSION = '13';
   var cfg = window.NFCREV_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
   var $app = document.getElementById('app');
@@ -35,6 +35,7 @@
     codes: [],
     editing: null,
     delVenue: false,
+    offQ: null,
     recovery: /type=recovery/.test(location.hash),
     busy: false,
     installDismissed: false
@@ -179,7 +180,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=13" alt="NFC REV"></div>' +
       '<p class="muted">Feedback dei tuoi clienti, semplice.</p></div>' +
       '<form class="card" id="authForm" autocomplete="on">' +
       '<h2>' + (reg ? 'Crea il tuo account' : 'Accedi') + '</h2>' + msg +
@@ -270,7 +271,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=13" alt="NFC REV"></div></div>' +
       '<form class="card" id="forgotForm"><h2>Recupera la password</h2>' +
       '<p class="muted" style="margin-top:6px">Scrivi l\'email del tuo account: ti mandiamo un link per scegliere una nuova password.</p>' + msg +
       '<label for="fEmail">Email</label><input id="fEmail" type="email" required autocomplete="email" inputmode="email">' +
@@ -294,7 +295,7 @@
     var msg = S.authMsg ? '<div class="msg ' + S.authMsg.kind + '">' + esc(S.authMsg.text) + '</div>' : '';
     $app.innerHTML =
       '<div class="wrap" style="padding-top:40px">' +
-      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=12" alt="NFC REV"></div></div>' +
+      '<div style="text-align:center;margin-bottom:18px"><div class="brand-box"><img src="wordmark.png?v=13" alt="NFC REV"></div></div>' +
       '<form class="card" id="recForm"><h2>Scegli una nuova password</h2>' + msg +
       '<label for="np1">Nuova password (almeno 8 caratteri)</label><input id="np1" type="password" required minlength="8" autocomplete="new-password">' +
       '<label for="np2">Ripetila</label><input id="np2" type="password" required minlength="8" autocomplete="new-password">' +
@@ -330,7 +331,7 @@
     } else if (S.venues.length === 1) {
       mid = '<span class="venue-name">' + esc(S.venues[0].name) + '</span>';
     } else mid = '<span class="grow"></span>';
-    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=12" alt="NFC REV">' + mid +
+    return '<div class="top"><div class="top-in"><img class="brand-img" src="wordmark.png?v=13" alt="NFC REV">' + mid +
       '<button class="logout" id="logout">Esci</button></div></div>';
   }
   function tabsBar() {
@@ -351,7 +352,7 @@
     else if (S.tab === 'venue') body = viewVenue();
     else if (S.tab === 'admin' && S.isAdmin) body = viewAdmin();
     else body = viewAnswers();
-    $app.innerHTML = header() + '<div class="wrap">' + body + '</div>' + tabsBar() + (S.editing ? modalQuestion() : '') + (S.delVenue ? modalDelete() : '');
+    $app.innerHTML = header() + '<div class="wrap">' + body + '</div>' + tabsBar() + (S.editing ? modalQuestion() : '') + (S.delVenue ? modalDelete() : '') + (S.offQ ? modalOff() : '');
     bind();
   }
 
@@ -512,6 +513,31 @@
       '<div style="margin-top:16px"><button class="btn gold block" id="qSave">Salva</button></div></div></div>';
   }
 
+  function modalOff() {
+    var q = S.questions.filter(function (x) { return x.id === S.offQ; })[0];
+    if (!q) return '';
+    return '<div class="modal-bg" id="obg"><div class="modal" role="dialog" aria-modal="true">' +
+      '<h2>Spegnere questa domanda?</h2>' +
+      '<p style="margin-top:8px"><b>' + esc(q.text) + '</b></p>' +
+      '<p class="muted" style="margin-top:8px">Spegnere significa nasconderla dal questionario: i nuovi clienti <b>non la vedranno più</b> e non potranno rispondere.</p>' +
+      '<ul class="muted" style="margin:0 0 6px;padding-left:20px"><li>La domanda <b>non viene cancellata</b>: resta nell\'elenco, segnata come "Spenta".</li>' +
+      '<li>Le risposte già ricevute <b>restano salvate</b> e visibili.</li>' +
+      '<li>Puoi riaccenderla quando vuoi con il tasto "Accendi".</li></ul>' +
+      '<div class="row" style="margin-top:14px"><button class="btn line grow" id="oCancel">Annulla</button>' +
+      '<button class="btn gold grow" id="oGo">Conferma</button></div></div></div>';
+  }
+  function bindOff() {
+    var close = function () { S.offQ = null; render(); };
+    document.getElementById('oCancel').onclick = close;
+    document.getElementById('obg').onclick = function (e) { if (e.target.id === 'obg') close(); };
+    document.getElementById('oGo').onclick = function () {
+      var id = S.offQ, q = S.questions.filter(function (x) { return x.id === id; })[0];
+      if (!q) { close(); return; }
+      guard(sb.from('questions').update({ active: false }).eq('id', id).then(function (r) {
+        if (r.error) throw r.error; q.active = false; S.offQ = null; render(); toast('Domanda spenta');
+      }));
+    };
+  }
   function modalDelete() {
     var v = currentVenue();
     if (!v) return '';
@@ -661,6 +687,7 @@
         S.editing = { id: q.id, text: q.text, type: q.type, options: (q.options || []).slice(), required: q.required }; render();
       };
       if ((b = card.querySelector('[data-toggle]'))) b.onclick = function () {
+        if (q.active) { S.offQ = q.id; render(); return; }
         guard(sb.from('questions').update({ active: !q.active }).eq('id', id).then(function (r) {
           if (r.error) throw r.error; q.active = !q.active; render();
         }));
@@ -687,6 +714,7 @@
       var inp = document.getElementById('dName'); if (inp) inp.focus();
     };
     if (S.delVenue) bindDelete();
+    if (S.offQ) bindOff();
 
     // admin
     if ((el = document.getElementById('cGen'))) el.onclick = genCodes;
@@ -909,10 +937,10 @@
     if (n > 0) { var b = document.createElement('span'); b.className = 'badge'; b.textContent = n > 9 ? '9+' : n; ic.appendChild(b); }
   }
   function refresh() {
-    if (!S.session || S.recovery || S.editing || S.delVenue || !S.venueId) return;
+    if (!S.session || S.recovery || S.editing || S.delVenue || S.offQ || !S.venueId) return;
     var onAnswers = S.tab === 'answers';
     Promise.all([loadAlerts(), onAnswers ? loadVenueData() : null]).then(function () {
-      if (S.editing || S.delVenue) return;
+      if (S.editing || S.delVenue || S.offQ) return;
       if (onAnswers && S.tab === 'answers') render(); else paintBadge();
     });
   }
